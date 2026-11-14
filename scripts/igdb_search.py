@@ -19,7 +19,7 @@ logged, or included in error messages.
 import argparse
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -31,7 +31,7 @@ PAGE_SIZE = 10
 TIMEOUT_SECONDS = 10
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REQUIRED_VARS = ("IGDB_CLIENT_ID", "IGDB_CLIENT_SECRET")
-UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 class ScriptError(Exception):
@@ -42,12 +42,13 @@ class ScriptError(Exception):
 # Command-line input
 # ---------------------------------------------------------------------------
 
+
 def page_number(value: str) -> int:
     """argparse type for --page: a whole number of 1 or more."""
     try:
         page = int(value)
     except ValueError:
-        raise argparse.ArgumentTypeError(f"must be a whole number, got {value!r}")
+        raise argparse.ArgumentTypeError(f"must be a whole number, got {value!r}") from None
     if page < 1:
         raise argparse.ArgumentTypeError(f"must be 1 or higher, got {page}")
     return page
@@ -59,7 +60,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("title", nargs="+", help='game title, e.g. "The Witcher 3"')
     parser.add_argument(
-        "--page", type=page_number, default=1,
+        "--page",
+        type=page_number,
+        default=1,
         help="results page to show, starting at 1 (default: 1)",
     )
     args = parser.parse_args(argv)
@@ -74,6 +77,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 # Credentials
 # ---------------------------------------------------------------------------
+
 
 def load_credentials() -> tuple[str, str]:
     """Return (client_id, client_secret) from the environment or .env."""
@@ -93,6 +97,7 @@ def load_credentials() -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 # HTTP helpers
 # ---------------------------------------------------------------------------
+
 
 def post(url: str, service: str, **kwargs) -> requests.Response:
     """POST with a timeout, turning network failures into safe messages.
@@ -124,6 +129,7 @@ def parse_json(response: requests.Response, service: str):
 # ---------------------------------------------------------------------------
 # Twitch token
 # ---------------------------------------------------------------------------
+
 
 def get_access_token(client_id: str, client_secret: str) -> str:
     """Request a fresh app access token (client credentials grant).
@@ -158,6 +164,7 @@ def get_access_token(client_id: str, client_secret: str) -> str:
 # ---------------------------------------------------------------------------
 # IGDB search
 # ---------------------------------------------------------------------------
+
 
 def escape_query_string(text: str) -> str:
     """Escape backslashes and double quotes for an Apicalypse string literal."""
@@ -204,6 +211,7 @@ def search_games(client_id: str, token: str, title: str, page: int) -> list[dict
 # Output
 # ---------------------------------------------------------------------------
 
+
 def format_release_date(timestamp) -> str:
     """Unix timestamp (seconds) -> 'YYYY-MM-DD' in UTC, or 'Unknown'.
 
@@ -214,7 +222,7 @@ def format_release_date(timestamp) -> str:
         return "Unknown"
     try:
         return (UNIX_EPOCH + timedelta(seconds=timestamp)).strftime("%Y-%m-%d")
-    except (OverflowError, ValueError):
+    except OverflowError, ValueError:
         return "Unknown"
 
 
@@ -248,6 +256,7 @@ def format_results(games: list[dict], title: str, page: int) -> str:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main(argv: list[str] | None = None) -> int:
     # Game titles can contain characters the Windows console encoding lacks;

@@ -1,0 +1,58 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Video Game Tracker{% endblock %} · Video Game Tracker</title>
+  <link rel="stylesheet" href="{% static 'games/vendor/bootstrap-5.3.8/css/bootstrap.min.css' %}">
+</head>
+<body class="d-flex flex-column min-vh-100 bg-body-tertiary">
+  {# navbar-expand keeps the links visible at every width, so no JS toggler is needed. #}
+  <nav class="navbar navbar-expand bg-dark border-bottom" data-bs-theme="dark">
+    <div class="container flex-wrap gap-2">
+      <a class="navbar-brand" href="{% url 'games:home' %}">Video Game Tracker</a>
+      {% if user.is_authenticated %}
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link{% if request.resolver_match.url_name == 'saved_games' %} active" aria-current="page{% endif %}" href="{% url 'games:saved_games' %}">My Saved Games</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link{% if request.resolver_match.url_name == 'search' %} active" aria-current="page{% endif %}" href="{% url 'games:search' %}">Search IGDB</a>
+          </li>
+        </ul>
+        <div class="d-flex align-items-center gap-3">
+          <span class="navbar-text" data-testid="nav-username">Signed in as <strong>{{ user.get_username }}</strong></span>
+          <form method="post" action="{% url 'logout' %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+          </form>
+        </div>
+      {% else %}
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Log in</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'signup' %}">Sign up</a></li>
+        </ul>
+      {% endif %}
+    </div>
+  </nav>
+
+  <main class="container py-4 flex-grow-1">
+    {% if messages %}
+      <div class="mb-3" aria-live="polite">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags|default:'info' }}" role="alert">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-top bg-body py-3 mt-auto">
+    <div class="container small text-body-secondary">
+      Game data and cover art from <a href="https://www.igdb.com/" rel="noopener">IGDB.com</a>
+    </div>
+  </footer>
+
+  <script src="{% static 'games/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js' %}" defer></script>
+</body>
+</html>

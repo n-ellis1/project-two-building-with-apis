@@ -1,5 +1,19 @@
 # project-two-building-with-apis
 
+## Django game tracker (in progress)
+
+From the repo root in PowerShell, after `uv sync` and creating `.env` from `.env.example` (see step 2 below):
+
+1. Set `DJANGO_SECRET_KEY` in `.env` to a long random string (`.env.example` shows a command that generates one) and `DJANGO_DEBUG=True` for local development. The IGDB variables are optional for the site.
+2. Create the database and start the server:
+
+   ```powershell
+   uv run python manage.py migrate
+   uv run python manage.py runserver   # http://127.0.0.1:8000/
+   ```
+
+Optional: `uv run python manage.py createsuperuser` for `/admin/`. Full setup docs are completed in Phase 12.
+
 ## IGDB verification script
 
 `scripts/igdb_search.py` searches [IGDB](https://www.igdb.com) for games by title and prints each match's title, IGDB ID, release date (UTC) and platforms, up to 10 results per page. It confirms that real API requests work before the Django game tracker is designed. Background research is in [docs/research/game-api-comparison.md](docs/research/game-api-comparison.md).

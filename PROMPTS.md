@@ -28,6 +28,50 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-14 — Phase 2: Django project skeleton, accounts, Bootstrap layout and verification record
+
+### Prompts
+1. `/implement` Read CLAUDE.md, prd/video-game-tracker.md, and plans/video-game-tracker.md. Implement Phase 2 only: the Django project skeleton, accounts, local Bootstrap layout, IGDB attribution footer, and initial docs/verification.md.
+
+   Follow the approved plan and run the Phase 2 automated checks. Give me the exact PowerShell commands to start the server and the browser steps I should follow to verify signup, login, logout, redirects, and the layout. Stop for my manual verification before marking Phase 2 complete, staging, committing, pushing, or starting Phase 3.
+2. I approve all three test-first behaviors and the ordinary regression tests you listed. For the startup test, make sure the subprocess cannot reload IGDB credentials from my local .env. Verify both IGDB variables are absent after settings load, without changing my real .env. Keep any other settings Django needs for the check.
+
+   Run the test-first checks and confirm they fail for the expected reasons before implementing the corresponding behavior. Then finish Phase 2 and run the planned automated checks. Give me the exact PowerShell command to start the server and the browser verification steps. Pause for my manual verification before marking the phase complete, staging, committing, pushing, or starting Phase 3.
+3. I finished the Phase 2 manual checks. Signup validation and automatic login worked, the login redirects behaved as expected, direct GET logout returned 405, and the Log out button worked. The IGDB footer, phone-width layout, and offline Bootstrap styling looked good. I also started Django using the temporary settings without IGDB credentials. Both presence checks printed False, and I could log in and open My Saved Games.
+
+   Record the manual results in docs/verification.md. Update CLAUDE.md to show which commands now work and document DJANGO_ENV_FILE. Append the Phase 2 session log to PROMPTS.md and mark Phase 2 complete in the plan. Keep credential values out of all files and output.
+
+   Run the five standard checks once more and show me the results, git status --short, and the suggested commit message. Pause before staging, committing, pushing, or starting Phase 3.
+4. Tick the Initial root CLAUDE.md item in plans/video-game-tracker.md and reference commit f0750a4. Add this final checklist and staging request to the Phase 2 entry in PROMPTS.md.
+
+   Stage only the Phase 2 files from your status: .env.example, CLAUDE.md, PROMPTS.md, README.md, plans/video-game-tracker.md, pyproject.toml, scripts/igdb_search.py, uv.lock, config/, docs/verification.md, docs/verification/screenshots/.gitkeep, games/, and manage.py.
+
+   Show git diff --cached --name-only and git diff --cached --check. Confirm that .env and db.sqlite3 are absent from the staged list. Leave the commit and push to me, and stop before Phase 3.
+
+### Summary
+- **Outcome:**
+  - **Stack:** added Django 6.1.3 and Ruff 0.17.5 (dev group, configured in `pyproject.toml`). Project package `config`, app `games`.
+  - **Settings:** read `DJANGO_SECRET_KEY` (required, clear error if missing) and `DJANGO_DEBUG` from `.env`. IGDB credentials are optional and exposed as empty strings when unset. New `DJANGO_ENV_FILE` override loads a different env file instead of `.env`.
+  - **Pages:** sign-up (Django's user creation form, signs the user in, lands on My Saved Games), Django's login view (lands on My Saved Games, honors safe `next`, ignores off-site `next`), POST-only logout (GET returns 405), `/` redirect by auth state, a login-protected empty My Saved Games, a login-protected Search IGDB placeholder, and the admin.
+  - **Layout:** Bootstrap 5.3.8 vendored as static files (no CDN), nav with My Saved Games, Search IGDB, the username and a Logout POST button, a messages area, and the "Game data and cover art from IGDB.com" footer on every page. The nav uses `navbar-expand` so it works without JavaScript and wraps at phone width.
+  - **TDD (three approved behaviors), each RED on an assertion first:**
+    - **Startup without IGDB credentials:** the subprocess's `check` passed, but settings reloaded both IGDB values from the real `.env` (all four presence flags `True`). Fixed with `DJANGO_ENV_FILE`. The test strips both IGDB variables, points settings at an empty temp file, keeps the rest of the environment, and reports presence booleans only. The real `.env` was never written.
+    - **Sign-up:** a valid POST returned 200 from the stub instead of redirecting. Fixed by saving, signing in and redirecting.
+    - **Home redirect:** `/` returned an empty 200 from the stub. Fixed by redirecting by auth state.
+  - **Regression tests (15 more):** invalid sign-up, login landing, safe and off-site `next`, wrong password, protected-page redirects with `next` and the return trip, the empty state, logout GET 405 and POST, footer on public and protected pages, nav contents, and local Bootstrap paths. 18 tests in total, and all five standard checks pass.
+  - **Docs:** created `docs/verification.md` with all planned sections and the Phase 2 results (all passed 2026-11-14), added the Django placeholders to `.env.example`, added a short README section, and updated CLAUDE.md (working commands, layout, `DJANGO_ENV_FILE`, Ruff skipping `*.md`). Marked Phase 2 and its acceptance criteria complete in the plan, and ticked the plan's "Initial root `CLAUDE.md`" item with a reference to commit `f0750a4` (the user's request).
+  - **Staged for the user to commit:** only the Phase 2 files the user named. `.env` and `db.sqlite3` are absent from the staged list. Nothing committed or pushed. Phase 3 not started.
+- **Deviations:**
+  - **Startup test tightened by the user:** asked that the subprocess be unable to reload credentials from the real `.env`, that both IGDB variables be confirmed absent after settings load, and that other needed settings be kept. This shaped the `DJANGO_ENV_FILE` design.
+  - **TDD pauses:** the user asked me to confirm each RED and continue, instead of stopping after every RED and GREEN as the `/tdd` skill describes. The RED reasons were reported together before manual verification.
+  - **Manual "no IGDB credentials" step changed:** the plan suggested overriding the IGDB variables as empty in PowerShell, but in Windows PowerShell 5.1 that deletes them and `.env` fills them back in. The user ran the check with a temporary `DJANGO_ENV_FILE` and a throwaway secret key instead.
+- **Sideways:**
+  - **Ruff and the existing script:** the first `ruff check .` flagged `scripts/igdb_search.py` (`timezone.utc`, a missing `raise ... from None`), and `ruff format` changed its blank lines and wrote the Python 3.14 `except OverflowError, ValueError:` form. The script was rerun afterwards: live search exit 0, usage error exit 2, date fallback unchanged.
+  - **Ruff reformatted a doc by accident:** Ruff 0.17 also formats Python code blocks in Markdown, so `ruff format .` rewrote a snippet in `docs/research/game-api-comparison.md`. Caught in `git status`, restored from git, and `*.md` excluded in `pyproject.toml`.
+  - **One test was wrong, not the code:** the empty-state test expected an HTML-escaped apostrophe, but literal template text isn't escaped. The test was fixed.
+  - **Vendored Bootstrap trimmed:** the trailing `sourceMappingURL` comments were removed, so DevTools doesn't request missing `.map` files. Recorded in the vendor folder's `SOURCE.md`.
+  - **Secret key needed in `.env`:** Django now requires `DJANGO_SECRET_KEY`. I suggested a command that adds it to `.env` without ever displaying it, and the user set it up before the manual checks. My own checks during implementation used a throwaway key set only in the shell.
+
 ## 2026-11-14 — Phase 1: verify IGDB game types and settle the Game Category rules
 
 ### Prompts

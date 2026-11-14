@@ -20,16 +20,18 @@ Python 3.14, uv, Django 6.1, SQLite, Bootstrap 5.3 and HTMX 2.x stored as static
 
 ## Commands (PowerShell, from the repo root)
 
-**Work now:**
+**Work now** (Django needs `DJANGO_SECRET_KEY` in `.env`, and `DJANGO_DEBUG=True` so runserver serves static files):
 
 ```powershell
 uv sync                                          # install dependencies
+uv run python manage.py migrate
+uv run python manage.py runserver                # http://127.0.0.1:8000/
 uv run scripts/igdb_search.py "The Witcher 3"    # live IGDB check (needs .env), exit 0 on success
 uv run scripts/igdb_search.py "The Witcher 3" --page 2
 git check-ignore -v -- .env                      # must print the .gitignore rule
 ```
 
-**Available from Phase 2** (Django and Ruff aren't installed yet, so these fail until then). These are the standard automated checks for every phase from Phase 2 on:
+**Standard automated checks** (every phase from Phase 2 on):
 
 ```powershell
 uv run python manage.py check
@@ -37,14 +39,15 @@ uv run python manage.py makemigrations --check --dry-run
 uv run python manage.py test
 uv run ruff check .
 uv run ruff format --check .
-uv run python manage.py runserver                # http://127.0.0.1:8000/
 ```
+
+Ruff skips `*.md` (`extend-exclude` in `pyproject.toml`), because Ruff 0.17 would otherwise reformat Python samples in the docs.
 
 **Later:** the demo seed command (Phase 3), `uv run python manage.py drf_create_token <username>` (Phase 10), and `uv run scripts/entries_client.py list|update` (Phase 11).
 
 ## Conventions
 
-- **Layout:** one project package and one app, `games`, which holds models, views, API, IGDB client, save service, templates and static files.
+- **Layout:** one project package, `config` (settings, root URLs), and one app, `games`, which holds models, views, API, IGDB client, save service, templates (`games/templates/games/`, auth pages in `games/templates/registration/`), static files and tests (`games/tests/`). Bootstrap 5.3.8 is vendored in `games/static/games/vendor/bootstrap-5.3.8/` (see its `SOURCE.md`). Every page extends `games/base.html`.
 - **Routes:**
   - `/games/` My Saved Games; `/games/<id>/` plus `edit/`, `delete/` and `refresh/`, where `<id>` is the **Entry** ID
   - `/search/` and `/search/save/`
@@ -63,12 +66,14 @@ uv run python manage.py runserver                # http://127.0.0.1:8000/
 
 - **Never** read, print, log or commit `.env`, IGDB credentials, Twitch tokens, API tokens or passwords. Keep them out of PROMPTS.md, docs and screenshots.
 - `.env` is git-ignored, and `.env.example` holds placeholders only. Add new placeholders in the phase that first needs them.
+- Settings load `.env` from the repo root, and variables already set in the shell win. IGDB credentials are optional, so Django starts without them. `DJANGO_SECRET_KEY` is required.
+- `DJANGO_ENV_FILE` (optional, never in `.env`) makes settings load a different env file instead of `.env`. Tests use it to run Django without the developer's real credentials (`games/tests/test_startup.py`). Use it for manual "no IGDB credentials" checks too, because in Windows PowerShell 5.1 setting `$env:IGDB_CLIENT_ID = ""` deletes the variable and `.env` fills it back in. Check settings by printing presence booleans only, never values.
 - Before staging, confirm `.env` isn't in `git diff --cached --name-only`.
 - Throwaway scripts that call the live API go in the session scratchpad, not the repo, and must not print secrets.
 
 ## Per-phase workflow
 
-Work on one phase at a time (`/implement` with the PRD and plan). Phase 1 is done.
+Work on one phase at a time (`/implement` with the PRD and plan). Phases 1 and 2 are done.
 
 1. Implement the phase, using `/tdd` where it fits.
 2. Run the standard checks and the phase's own checks until they pass.

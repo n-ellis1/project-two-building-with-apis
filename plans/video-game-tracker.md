@@ -167,12 +167,14 @@ Sign-up with Django's user creation form (signs the new user in), Django's login
 
 ### Acceptance criteria
 
-- [ ] Signing up creates the user, signs them in and lands on My Saved Games.
-- [ ] Login lands on My Saved Games. Opening `/games/` while signed out redirects to login and returns there afterwards. An off-site `next` is ignored.
-- [ ] Logout works only by POST (GET is rejected) and leaves you signed out.
-- [ ] `/search/` redirects signed-out visitors to login.
-- [ ] The footer attribution appears on every page.
-- [ ] `runserver` and the test suite start with the IGDB variables unset.
+- [x] Signing up creates the user, signs them in and lands on My Saved Games.
+- [x] Login lands on My Saved Games. Opening `/games/` while signed out redirects to login and returns there afterwards. An off-site `next` is ignored.
+- [x] Logout works only by POST (GET is rejected) and leaves you signed out.
+- [x] `/search/` redirects signed-out visitors to login.
+- [x] The footer attribution appears on every page.
+- [x] `runserver` and the test suite start with the IGDB variables unset.
+
+**Result (2026-11-14):** all standard checks pass (18 tests), and the manual steps passed (see [docs/verification.md](../docs/verification.md)). The project package is `config`. `DJANGO_ENV_FILE` lets tests and manual checks load a different env file instead of `.env` (documented in CLAUDE.md).
 
 ### Automated checks
 
@@ -697,8 +699,8 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 ## Phase checklist
 
 - [x] Phase 1: Verify IGDB game types (live verification and documentation checkpoint)
-- [ ] Initial root `CLAUDE.md` (before the first `/implement` phase)
-- [ ] Phase 2: Project skeleton, accounts and site layout
+- [x] Initial root `CLAUDE.md` (before the first `/implement` phase; commit `f0750a4`)
+- [x] Phase 2: Project skeleton, accounts and site layout
 - [ ] Phase 3: Models, admin, demo seed and basic My Saved Games
 - [ ] Phase 4: Entry detail page and covers
 - [ ] Phase 5: Edit and delete entries

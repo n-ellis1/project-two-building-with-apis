@@ -1,0 +1,12 @@
+{% extends "games/base.html" %}
+{% block title %}My Saved Games{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">My Saved Games</h1>
+<div class="card shadow-sm">
+  <div class="card-body text-center py-5">
+    <p class="lead mb-2">You haven't saved any games yet.</p>
+    <p class="text-body-secondary mb-3">Search IGDB to find a game and add it to your list.</p>
+    <a class="btn btn-primary" href="{% url 'games:search' %}">Search IGDB</a>
+  </div>
+</div>
+{% endblock %}

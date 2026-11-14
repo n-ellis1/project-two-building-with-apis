@@ -3,6 +3,21 @@ name = "project-two-building-with-apis"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
+    "django>=6.1,<6.2",
     "python-dotenv>=1.2.4",
     "requests>=2.34.2",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.5",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+# Leave code samples in docs, the PRD, the plan and PROMPTS.md as written.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "DJ"]
