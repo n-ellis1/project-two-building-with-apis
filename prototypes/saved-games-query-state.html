@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saved Games Query State</title>
+<style>
+  :root {
+    --bg: #f7f7f8; --panel: #ffffff; --ink: #1d1d22; --muted: #62626e; --line: #e2e2e8;
+    --accent: #4f46e5; --accent-soft: #eef0ff; --warn: #9a5b00; --warn-soft: #fff4e0;
+    --ok-soft: #e9f7ef; --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  h3 { font-size: 14px; margin: 16px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  p { margin: 0 0 8px; }
+  .lede { color: var(--muted); max-width: 900px; }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; margin-top: 16px; align-items: start; }
+  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .addr { display: flex; gap: 8px; align-items: center; font-family: var(--mono); font-size: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; }
+  .addr b { color: var(--accent); }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; margin-top: 12px; }
+  .fact small { display: block; color: var(--muted); font-size: 12px; }
+  .fact span { font-weight: 600; }
+  .changes { margin-top: 12px; background: var(--accent-soft); border-radius: 8px; padding: 8px 12px; font-size: 14px; }
+  .changes ul, .explain ul { margin: 4px 0 0; padding-left: 18px; }
+  .explain { margin-top: 8px; background: var(--warn-soft); border-radius: 8px; padding: 8px 12px; font-size: 14px; color: #5a3a00; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+  .controls label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 2px; }
+  input[type=text], select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); min-width: 0; }
+  button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  .check { flex-direction: row !important; align-items: center; gap: 6px !important; font-size: 14px !important; color: var(--ink) !important; padding-bottom: 6px; }
+  .banner { margin: 12px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--warn-soft); color: #5a3a00; font-size: 14px; }
+  .count { margin: 12px 0 8px; color: var(--muted); font-size: 14px; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+  td.game { white-space: normal; min-width: 220px; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  th.sorted, td.sorted { background: var(--accent-soft); }
+  .cat { font-size: 11px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); margin-left: 4px; }
+  .why { display: block; font-size: 12px; color: var(--muted); }
+  .tie { display: block; font-size: 12px; color: var(--warn); font-weight: 600; }
+  .dup { display: block; font-size: 12px; color: #b42318; font-weight: 600; }
+  .muted { color: var(--muted); }
+  .pager { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
+  .pager .cur { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .notfound { padding: 32px; text-align: center; border: 1px dashed var(--line); border-radius: 8px; margin-top: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chips button { font-family: var(--mono); font-size: 13px; padding: 3px 8px; }
+  fieldset { border: 0; padding: 0; margin: 0 0 14px; }
+  legend { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  fieldset label { display: flex; gap: 6px; align-items: baseline; font-size: 14px; padding: 2px 0; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+  .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 10px; color: var(--muted); }
+  .tabs button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .steps { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; align-items: flex-start; }
+  .steps button.done { background: var(--ok-soft); }
+  .steps button.next { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .watch { font-size: 14px; background: var(--bg); border-radius: 8px; padding: 8px 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Saved Games: search, filters, sort and pages <span class="tag">Throwaway prototype</span></h1>
+  <p class="lede">
+    <strong>Question:</strong> On the saved-games page, search text, filters, sort and page number all live in the address bar.
+    Which rules feel right for <em>Clear filters</em>, for changing something while you're on page 2 or 3, for bad page numbers
+    (<code>page=abc</code>, <code>page=0</code>, <code>page=99</code>), and for an unknown sort (<code>sort=banana</code>)?
+    It also checks the agreed rules: search across title, summary, platforms, genres and notes with each entry shown once,
+    seven sort options with missing values last and fixed tie-breakers, and 12 entries per page. 27 sample entries, all in memory.
+  </p>
+
+  <div class="grid">
+    <div>
+      <!-- Current state -->
+      <section class="panel" aria-labelledby="state-h">
+        <h2 id="state-h">Current state</h2>
+        <div class="addr"><span class="muted">Address bar</span> <b id="addr"></b></div>
+        <div class="facts" id="facts"></div>
+        <div class="changes" id="changes"></div>
+        <div class="explain" id="explain" hidden></div>
+      </section>
+
+      <!-- The saved-games page -->
+      <section class="panel" aria-labelledby="page-h">
+        <h2 id="page-h">The saved-games page (free play)</h2>
+        <div class="controls">
+          <label>Search
+            <span style="display:flex;gap:6px"><input type="text" id="q" placeholder="title, summary, platform, genre, notes" size="30"><button class="primary" id="go-search">Search</button></span>
+          </label>
+          <label>Status <select id="f-status"></select></label>
+          <label>Platform Played <select id="f-platform"></select></label>
+          <label>Game Category <select id="f-category"></select></label>
+          <label class="check"><input type="checkbox" id="f-favorite"> Favorites only</label>
+          <label>Sort <select id="sort"></select></label>
+          <button id="clear">Clear filters</button>
+        </div>
+        <div id="banner"></div>
+        <div id="results"></div>
+      </section>
+
+      <!-- Guided walkthroughs -->
+      <section class="panel" aria-labelledby="walk-h">
+        <h2 id="walk-h">Guided walkthroughs</h2>
+        <div class="tabs" id="tabs" role="tablist"></div>
+        <div id="walk"></div>
+      </section>
+    </div>
+
+    <aside>
+      <section class="panel" aria-labelledby="beh-h">
+        <h2 id="beh-h">Behaviours to compare</h2>
+        <p class="muted" style="font-size:13px">Switching a choice re-applies it to the current address straight away.</p>
+        <div id="behaviour"></div>
+      </section>
+      <section class="panel" aria-labelledby="addr-h">
+        <h2 id="addr-h">Type in the address bar</h2>
+        <p class="muted" style="font-size:13px">Simulates someone editing the URL by hand or following an old link.</p>
+        <div style="display:flex;gap:6px"><input type="text" id="addr-in" placeholder="?page=abc" style="flex:1;font-family:var(--mono)"><button id="addr-go">Go</button></div>
+        <div class="chips" id="chips"></div>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<!-- ===================== Pure logic module: no DOM in here ===================== -->
+<script>
+const Model = (() => {
+  const PAGE_SIZE = 12;
+  const PC = "PC (Microsoft Windows)", PS3 = "PlayStation 3", PS4 = "PlayStation 4", PS5 = "PlayStation 5",
+    XONE = "Xbox One", XSX = "Xbox Series X|S", X360 = "Xbox 360", NSW = "Nintendo Switch", NSW2 = "Nintendo Switch 2",
+    ARC = "Arcade", SNES = "Super Nintendo Entertainment System", DOS = "DOS", IOS = "iOS", AND = "Android";
+  const RPG = "Role-playing (RPG)", ADV = "Adventure", SHO = "Shooter", PLA = "Platform", PUZ = "Puzzle",
+    STR = "Strategy", TAC = "Tactical", IND = "Indie", RAC = "Racing", FIG = "Fighting", SIM = "Simulator",
+    HNS = "Hack and slash/Beat 'em up", ARCG = "Arcade", CARD = "Card & Board Game";
+
+  const STATUSES = [["want_to_play", "Want to Play"], ["playing", "Playing"], ["completed", "Completed"], ["on_hold", "On Hold"], ["dropped", "Dropped"]];
+  const CATEGORIES = ["Main Game", "Expansion", "Remake", "Remaster"];
+
+  // id, title, released, category, platforms, genres, summary, status, platformPlayed, favorite, rating, hours, notes, added, updated
+  const E = (id, title, released, category, platforms, genres, summary, status, platformPlayed, favorite, rating, hours, notes, added, updated) =>
+    ({ id, title, released, category, platforms, genres, summary, status, platformPlayed, favorite, rating, hours, notes, added: "2026-" + added, updated: "2026-" + updated });
+
+  const ENTRIES = [
+    E(1, "The Witcher 3: Wild Hunt", "2015-05-19", "Main Game", [PC, PS4, XONE, NSW, PS5, XSX], [RPG, ADV], "Geralt of Rivia hunts for his adopted daughter across a war-torn open world.", "completed", PC, true, 10, 142, "Gwent addiction is real.", "09-01", "10-20"),
+    E(2, "The Witcher 3: Wild Hunt – Blood and Wine", "2016-05-31", "Expansion", [PC, PS4, XONE, NSW], [RPG, ADV], "Geralt travels to the duchy of Toussaint to track a mysterious beast.", "completed", PC, false, 9, 30, "Toussaint is gorgeous.", "09-02", "10-21"),
+    E(3, "Hades", "2020-09-17", "Main Game", [PC, NSW, PS4, PS5, XONE, XSX], [RPG, HNS, IND], "Zagreus fights his way out of the Underworld, one escape attempt at a time.", "completed", NSW, true, 10, 85, "Best roguelike I have played.", "09-03", "09-30"),
+    E(4, "Elden Ring", "2022-02-25", "Main Game", [PC, PS4, PS5, XONE, XSX], [RPG, ADV], "Explore the Lands Between and become Elden Lord.", "playing", PS5, true, 9, 60.5, "Stuck on Malenia.", "09-04", "11-10"),
+    E(5, "Stardew Valley", "2016-02-26", "Main Game", [PC, NSW, PS4, XONE, IOS, AND], [SIM, RPG, IND], "Inherit your grandfather's old farm and build a new life in Pelican Town.", "on_hold", NSW, false, 8, 40, "Paused in year 2, spring.", "09-05", "10-01"),
+    E(6, "Doom", "1993-12-10", "Main Game", [DOS, SNES], [SHO], "A lone marine fights demons on the moons of Mars.", "completed", DOS, false, 8, 12, "Still holds up.", "09-06", "09-06"),
+    E(7, "DOOM", "2016-05-13", "Main Game", [PC, PS4, XONE, NSW], [SHO], "The Doom Slayer returns to stop a demonic invasion of a Mars research facility.", "completed", PC, true, 8, 14, "Rip and tear.", "09-07", "09-15"),
+    E(8, "Street Fighter II: The World Warrior", "1991-02-06", "Main Game", [ARC, SNES], [FIG, ARCG], "Eight world warriors compete in a one-on-one fighting tournament.", "completed", ARC, false, 7, null, "Played at the bowling alley as a kid.", "09-08", "09-08"),
+    E(9, "Pac-Man 99", "2021-04-07", "Main Game", [NSW], [ARCG, PUZ], "Ninety-nine players race through mazes at once; the last one standing wins.", "dropped", NSW, false, 6, 3, "Servers shut down.", "09-09", "09-12"),
+    E(10, "Celeste", "2018-01-25", "Main Game", [PC, NSW, PS4, XONE], [PLA, IND], "Help Madeline survive her inner demons on her climb up Celeste Mountain.", "completed", NSW, true, 9, 22, "Collected every strawberry.", "09-10", "10-05"),
+    E(11, "Hollow Knight", "2017-02-24", "Main Game", [PC, NSW, PS4, XONE], [PLA, ADV, IND], "Descend into the ruined bug kingdom of Hallownest.", "playing", NSW, false, 8, 35, "Lost in Deepnest again.", "09-11", "11-02"),
+    E(12, "Shadow of the Colossus", "2018-02-06", "Remake", [PS4], [ADV], "A young man hunts sixteen colossi to revive a girl.", "completed", PS4, false, 7, 9, "", "09-12", "09-20"),
+    E(13, "Dark Souls: Remastered", "2018-05-24", "Remaster", [PC, PS4, XONE, NSW], [RPG], "The original Dark Souls with improved visuals and online play.", "dropped", PC, false, 7, 15, "Blighttown broke me.", "09-13", "09-25"),
+    E(14, "Portal 2", "2011-04-19", "Main Game", [PC, PS3, X360], [PUZ, SHO, PLA], "Solve physics puzzles with a portal gun inside the Aperture Science labs.", "completed", PC, false, 7, 10, "Co-op with my brother.", "09-14", "09-14"),
+    E(15, "Mario Kart 8 Deluxe", "2017-04-28", "Main Game", [NSW], [RAC], "Kart racing with every track and character from Mario Kart 8.", "playing", NSW, true, 7, null, "Family game night.", "09-15", "11-08"),
+    E(16, "Into the Breach", "2018-02-27", "Main Game", [PC, NSW], [STR, TAC, IND], "Command mechs from the future to defend Earth from giant monsters.", "completed", PC, false, 8, 18, "Every turn is a puzzle.", "09-16", "09-28"),
+    E(17, "Final Fantasy VII Remake", "2020-04-10", "Remake", [PS4, PS5, PC], [RPG], "Cloud Strife joins the eco-terrorist group Avalanche in the city of Midgar.", "on_hold", PS5, false, 6, 20, "Waiting to play Rebirth next.", "09-17", "10-10"),
+    E(18, "Halo: Combat Evolved Anniversary", "2011-11-15", "Remaster", [X360, PC], [SHO], "Master Chief's first mission, rebuilt with updated graphics.", "dropped", X360, false, 5, 4, "Prefer the original.", "09-18", "09-19"),
+    E(19, "Anthem", "2019-02-22", "Main Game", [PC, PS4, XONE], [SHO, RPG], "Freelancers in powered exosuits explore a dangerous world.", "dropped", PC, false, 3, 6, "Looked great, little to do.", "09-19", "09-22"),
+    E(20, "Cyberpunk 2077: Phantom Liberty", "2023-09-26", "Expansion", [PC, PS5, XSX], [RPG, SHO], "A spy-thriller expansion set in Dogtown, a new district of Night City.", "want_to_play", "", false, null, null, "", "09-20", "09-20"),
+    E(21, "The Elder Scrolls VI", null, "Main Game", [PC, XSX], [RPG], "The next entry in the Elder Scrolls series. No release date announced.", "want_to_play", "", false, null, null, "Someday.", "09-21", "09-21"),
+    E(22, "Hades II", "2025-09-25", "Main Game", [PC, NSW, NSW2], [RPG, HNS, IND], "Melinoë, Princess of the Underworld, battles the Titan of Time.", "playing", PC, true, null, 12, "Too early to rate.", "09-22", "11-12"),
+    E(23, "Baldur's Gate 3", "2023-08-03", "Main Game", [PC, PS5, XSX], [RPG, STR, TAC, ADV], "Gather a party and resist the mind flayer parasite in your head.", "want_to_play", "", false, null, null, "", "09-23", "09-23"),
+    E(24, "Metroid Prime Remastered", "2023-02-08", "Remaster", [NSW], [SHO, ADV], "Samus Aran explores the planet Tallon IV in first person.", "want_to_play", "", false, null, null, "", "09-24", "09-24"),
+    E(25, "The Legend of Zelda: Tears of the Kingdom", "2023-05-12", "Main Game", [NSW], [ADV, RPG], "Link explores the skies and depths of Hyrule.", "on_hold", NSW, false, null, 50, "Need to finish the shrines.", "09-25", "10-30"),
+    E(26, "Balatro", "2024-02-20", "Main Game", [PC, NSW, PS5, XONE, IOS], [CARD, STR, IND], "A poker-inspired roguelike deckbuilder.", "playing", PC, true, null, 30, "One more run.", "09-26", "11-13"),
+    E(27, "Silent Hill 2", "2024-10-08", "Remake", [PC, PS5], [ADV], "James Sunderland returns to Silent Hill after a letter from his late wife.", "want_to_play", "", false, null, null, "", "09-27", "09-27"),
+  ];
+
+  const DEFAULT_SORT = "-added";
+  const SORTS = [
+    { key: "title", label: "Title A to Z", field: "title", dir: "asc", isTitle: true, column: "game" },
+    { key: "-title", label: "Title Z to A", field: "title", dir: "desc", isTitle: true, column: "game" },
+    { key: "-added", label: "Date Added (Newest First)", field: "added", dir: "desc", column: "added" },
+    { key: "-rating", label: "Rating (Highest First)", field: "rating", dir: "desc", column: "rating" },
+    { key: "-released", label: "Release Date (Newest First)", field: "released", dir: "desc", column: "released" },
+    { key: "-hours", label: "Hours Played (Most First)", field: "hours", dir: "desc", column: "hours" },
+    { key: "-updated", label: "Last Updated (Newest First)", field: "updated", dir: "desc", column: "updated" },
+  ];
+  const FILTER_KEYS = ["status", "platform", "favorite", "category"];
+  const KEY_ORDER = ["q", "status", "platform", "favorite", "category", "sort", "page"];
+
+  const statusLabel = (code) => (STATUSES.find(([c]) => c === code) || [, code])[1];
+  const sortDef = (key) => SORTS.find((s) => s.key === key);
+  const platformsPlayed = () => [...new Set(ENTRIES.map((e) => e.platformPlayed).filter(Boolean))].sort();
+
+  // ---------- address bar ----------
+  function parseQuery(text) {
+    const s = String(text || "").trim().replace(/^.*?\?/, "").replace(/^\?/, "");
+    const raw = {};
+    for (const [k, v] of new URLSearchParams(s)) if (!(k in raw)) raw[k] = v;
+    return raw;
+  }
+  function buildQuery(raw) {
+    const keys = [...KEY_ORDER, ...Object.keys(raw).filter((k) => !KEY_ORDER.includes(k))];
+    const parts = keys.filter((k) => raw[k] !== undefined && raw[k] !== "").map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(raw[k])}`);
+    return parts.length ? "?" + parts.join("&") : "";
+  }
+
+  // ---------- criteria ----------
+  function readCriteria(raw, b) {
+    const explain = [];
+    const q = (raw.q || "").trim();
+    let status = raw.status || "";
+    if (status && !STATUSES.some(([c]) => c === status)) { explain.push(`Unknown status "${status}" ignored.`); status = ""; }
+    const platform = raw.platform || "";
+    const favorite = raw.favorite === "1";
+    let category = raw.category || "";
+    if (category && !b.categoryFilter) { explain.push(`Game Category filter is switched off, so category=${category} is ignored.`); category = ""; }
+    let sortKey = raw.sort || DEFAULT_SORT, unknownSort = null;
+    const userNotices = [];
+    if (!sortDef(sortKey)) {
+      unknownSort = sortKey; sortKey = DEFAULT_SORT;
+      explain.push(`Unknown sort "${unknownSort}", so the default sort is used.`);
+      if (b.unknownSort === "notice") userNotices.push(`We don't recognise the sort "${unknownSort}", so your games are sorted by ${sortDef(DEFAULT_SORT).label}.`);
+    }
+    return { q, status, platform, favorite, category, sortKey, unknownSort, explain, userNotices };
+  }
+
+  // ---------- search (simulates Q objects across joined platform and genre rows) ----------
+  function searchEntry(e, q) {
+    const t = q.toLowerCase(), has = (s) => String(s || "").toLowerCase().includes(t);
+    const base = [];
+    if (has(e.title)) base.push("title");
+    if (has(e.summary)) base.push("summary");
+    if (has(e.notes)) base.push("notes");
+    const plats = e.platforms.filter(has), gens = e.genres.filter(has);
+    const reasons = [...base, ...plats.map((p) => `platform: ${p}`), ...gens.map((g) => `genre: ${g}`)];
+    // Without distinct(), the SQL join yields one row per (platform, genre) pair that satisfies the OR.
+    let joinRows = 0;
+    const P = e.platforms.length ? e.platforms : [null], G = e.genres.length ? e.genres : [null];
+    for (const p of P) for (const g of G) if (base.length || (p && has(p)) || (g && has(g))) joinRows++;
+    return { matched: reasons.length > 0, reasons, joinRows };
+  }
+
+  function filterEntries(crit) {
+    const reasons = {};
+    let rowsBeforeDistinct = 0;
+    const list = ENTRIES.filter((e) => {
+      if (crit.status && e.status !== crit.status) return false;
+      if (crit.platform && e.platformPlayed !== crit.platform) return false;
+      if (crit.favorite && !e.favorite) return false;
+      if (crit.category && e.category !== crit.category) return false;
+      if (crit.q) {
+        const r = searchEntry(e, crit.q);
+        if (!r.matched) return false;
+        reasons[e.id] = r.reasons; rowsBeforeDistinct += r.joinRows;
+      } else rowsBeforeDistinct += 1;
+      return true;
+    });
+    return { list, reasons, rowsBeforeDistinct };
+  }
+
+  // ---------- sorting ----------
+  const sortValue = (e, field) => field === "title" ? e.title.toLowerCase() : e[field];
+  function cmpPrimary(a, b, s) {
+    const va = sortValue(a, s.field), vb = sortValue(b, s.field);
+    if (va === vb) return 0;
+    if (va == null) return 1;          // missing values last, whatever the direction
+    if (vb == null) return -1;
+    const r = va < vb ? -1 : 1;
+    return s.dir === "asc" ? r : -r;
+  }
+  const fmix = (h) => { h ^= h >>> 16; h = Math.imul(h, 0x85EBCA6B); h ^= h >>> 13; h = Math.imul(h, 0xC2B2AE35); h ^= h >>> 16; return h >>> 0; };
+  const scramble = (id, seed) => fmix((Math.imul(id, 0x9E3779B1) + Math.imul(seed, 0x7F4A7C15)) | 0);
+  function comparator(s, tieBreakers, seed) {
+    return (a, b) => {
+      const r = cmpPrimary(a, b, s);
+      if (r) return r;
+      if (!tieBreakers) return scramble(a.id, seed) - scramble(b.id, seed); // database's choice: not stable between requests
+      if (!s.isTitle) {
+        const ta = a.title.toLowerCase(), tb = b.title.toLowerCase();
+        if (ta !== tb) return ta < tb ? -1 : 1;
+      }
+      return a.id - b.id;
+    };
+  }
+
+  // ---------- pages ----------
+  function readPage(rawPage, numPages, b) {
+    if (rawPage === undefined || rawPage === "") return { view: "list", page: 1, kind: "none", explain: [] };
+    let kind, n;
+    if (!/^\d+$/.test(rawPage) || parseInt(rawPage, 10) < 1) kind = "invalid";
+    else { n = parseInt(rawPage, 10); if (n <= numPages) return { view: "list", page: n, kind: "ok", explain: [] }; kind = "out"; }
+    const choice = kind === "invalid" ? b.invalidPage : b.outOfRange;
+    const what = kind === "invalid" ? `"${rawPage}" is not a valid page number` : `Page ${n} is past the last page (${numPages})`;
+    if (choice === "first") return { view: "list", page: 1, kind, explain: [`${what}, so page 1 is shown.`] };
+    if (choice === "last") return { view: "list", page: numPages, kind, explain: [`${what}, so the last page (${numPages}) is shown.`] };
+    return { view: "notfound", page: null, kind, explain: [`${what}, so "Page not found" is shown.`] };
+  }
+
+  function boundaryTies(ordered, s, numPages) {
+    const marks = {};
+    for (let k = 1; k < numPages; k++) {
+      const i = k * PAGE_SIZE;
+      if (i >= ordered.length || cmpPrimary(ordered[i - 1], ordered[i], s) !== 0) continue;
+      const v = sortValue(ordered[i], s.field);
+      ordered.forEach((e, idx) => {
+        if (sortValue(e, s.field) !== v) return;
+        marks[e.id] = idx < i ? `Tie continues on page ${k + 1}` : `Tie continued from page ${k}`;
+      });
+    }
+    return marks;
+  }
+
+  // Without tie-breakers each page request may order tied rows differently.
+  function auditWithoutTieBreakers(list, s, numPages) {
+    const seen = {};
+    for (let p = 1; p <= numPages; p++) {
+      list.slice().sort(comparator(s, false, p)).slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE)
+        .forEach((e) => (seen[e.id] = [...(seen[e.id] || []), p]));
+    }
+    const dupes = list.filter((e) => (seen[e.id] || []).length > 1);
+    const missing = list.filter((e) => !seen[e.id]);
+    return { seen, dupes, missing };
+  }
+
+  // ---------- resolve the address into what the page shows ----------
+  function resolve(raw, b) {
+    const crit = readCriteria(raw, b);
+    const s = sortDef(crit.sortKey);
+    const { list, reasons, rowsBeforeDistinct } = filterEntries(crit);
+    const total = list.length, numPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const pg = readPage(raw.page, numPages, b);
+    const ordered = list.slice().sort(comparator(s, b.tieBreakers, pg.page || 1));
+    const start = pg.view === "list" ? (pg.page - 1) * PAGE_SIZE : 0;
+    return {
+      crit, sort: s, total, numPages, view: pg.view, page: pg.page, pageKind: pg.kind,
+      pageEntries: pg.view === "list" ? ordered.slice(start, start + PAGE_SIZE) : [],
+      start, reasons, rowsBeforeDistinct,
+      ties: b.tieBreakers ? boundaryTies(ordered, s, numPages) : {},
+      audit: b.tieBreakers ? null : auditWithoutTieBreakers(list, s, numPages),
+      explain: [...crit.explain, ...pg.explain], userNotices: crit.userNotices,
+    };
+  }
+
+  // ---------- actions (each returns a new address) ----------
+  function tidy(raw) {
+    const out = {};
+    for (const [k, v] of Object.entries(raw)) if (v !== undefined && v !== "") out[k] = v;
+    if (out.sort && (!sortDef(out.sort) || out.sort === DEFAULT_SORT)) delete out.sort;
+    if (out.favorite && out.favorite !== "1") delete out.favorite;
+    return out;
+  }
+  function afterChange(next, prevRaw, b) {
+    const out = tidy(next); delete out.page;
+    if (b.change === "first") return out;
+    const prev = resolve(prevRaw, b);
+    const target = prev.view === "list" ? prev.page : 1;
+    const p = Math.min(target, resolve(out, b).numPages);
+    if (p > 1) out.page = String(p);
+    return out;
+  }
+  const search = (raw, text, b) => afterChange({ ...raw, q: text.trim() }, raw, b);
+  const setFilter = (raw, key, value, b) => afterChange({ ...raw, [key]: value }, raw, b);
+  const setSort = (raw, key, b) => afterChange({ ...raw, sort: key }, raw, b);
+  function goToPage(raw, n) { const out = tidy(raw); delete out.page; if (n > 1) out.page = String(n); return out; }
+  function clearFilters(raw, b) {
+    if (b.clear === "all") return {};
+    const next = { ...raw };
+    FILTER_KEYS.forEach((k) => delete next[k]);
+    if (b.clear === "filtersSearch") delete next.q;
+    return afterChange(next, raw, b);
+  }
+
+  return { PAGE_SIZE, STATUSES, CATEGORIES, SORTS, DEFAULT_SORT, ENTRIES, statusLabel, sortDef, platformsPlayed,
+    parseQuery, buildQuery, resolve, search, setFilter, setSort, goToPage, clearFilters };
+})();
+</script>
+
+<!-- ===================== Page shell ===================== -->
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const DEFAULT_BEHAVIOUR = { clear: "filters", change: "first", invalidPage: "first", outOfRange: "last", unknownSort: "silent", categoryFilter: false, tieBreakers: true };
+let behaviour = { ...DEFAULT_BEHAVIOUR };
+let raw = {};
+let prev = null;
+let lastAction = "Page opened with no search, filters or sort.";
+
+const BEHAVIOUR_GROUPS = [
+  { key: "clear", title: "1. Clear filters…", options: [
+    ["filters", "Clears filters only; keeps search and sort"],
+    ["filtersSearch", "Clears filters and search; keeps sort"],
+    ["all", "Resets everything to the defaults"]] },
+  { key: "change", title: "2. Changing search, a filter or sort from a later page…", options: [
+    ["first", "Goes back to page 1"],
+    ["clamp", "Keeps the current page (or the last page if there are fewer pages now)"]] },
+  { key: "invalidPage", title: "3a. Invalid page (page=abc, page=0, page=-1)…", options: [
+    ["first", "Shows page 1"], ["last", "Shows the last page"], ["notfound", "Shows Page not found"]] },
+  { key: "outOfRange", title: "3b. Out-of-range page (page=99)…", options: [
+    ["first", "Shows page 1"], ["last", "Shows the last page"], ["notfound", "Shows Page not found"]] },
+  { key: "unknownSort", title: "4. Unknown sort (sort=banana)…", options: [
+    ["silent", "Uses the default sort silently"], ["notice", "Uses the default sort and shows a notice"]] },
+  { key: "categoryFilter", title: "Game Category filter (not decided yet)", options: [[false, "Off"], [true, "On"]] },
+  { key: "tieBreakers", title: "Tie-breakers (agreed: on)", options: [
+    [true, "On: title A to Z, then entry ID"], [false, "Off: simulate the database ordering ties differently per page"]] },
+];
+
+function renderBehaviour() {
+  $("behaviour").innerHTML = BEHAVIOUR_GROUPS.map((g) => `
+    <fieldset><legend>${esc(g.title)}</legend>
+      ${g.options.map(([v, label]) => `<label><input type="radio" name="b-${g.key}" value="${v}" ${behaviour[g.key] === v ? "checked" : ""}> ${esc(label)}</label>`).join("")}
+    </fieldset>`).join("");
+  BEHAVIOUR_GROUPS.forEach((g) => document.querySelectorAll(`input[name=b-${g.key}]`).forEach((el) =>
+    el.addEventListener("change", () => {
+      const opt = g.options.find(([v]) => String(v) === el.value);
+      behaviour[g.key] = opt[0];
+      act(`Behaviour changed: ${g.title.replace(/…$/, "")} → ${opt[1]}.`, raw);
+    })));
+}
+
+function fillSelect(el, options, value) {
+  el.innerHTML = options.map(([v, l]) => `<option value="${esc(v)}" ${v === value ? "selected" : ""}>${esc(l)}</option>`).join("");
+}
+
+function act(description, newRaw) { lastAction = description; raw = newRaw; render(); }
+
+function describeChanges(v) {
+  const out = [esc(lastAction)];
+  if (!prev) return out;
+  const a = Model.buildQuery(raw) || "(empty)", b = prev.url || "(empty)";
+  if (a !== b) out.push(`Address: <code>${esc(b)}</code> → <code>${esc(a)}</code>`);
+  if (prev.total !== v.total) out.push(`Matches: ${prev.total} → ${v.total}`);
+  const pa = prev.view === "list" ? `page ${prev.page} of ${prev.numPages}` : "Page not found";
+  const pb = v.view === "list" ? `page ${v.page} of ${v.numPages}` : "Page not found";
+  if (pa !== pb) out.push(`Showing: ${pa} → ${pb}`);
+  if (prev.sortKey !== v.sort.key) out.push(`Sort: ${Model.sortDef(prev.sortKey).label} → ${v.sort.label}`);
+  return out;
+}
+
+function fmt(v) { return v == null || v === "" ? '<span class="muted">—</span>' : esc(v); }
+
+function render() {
+  const v = Model.resolve(raw, behaviour);
+  const c = v.crit;
+
+  // State panel
+  $("addr").textContent = "/games/" + Model.buildQuery(raw);
+  const facts = [
+    ["Search", c.q ? `"${c.q}"` : "none"],
+    ["Status", c.status ? Model.statusLabel(c.status) : "Any"],
+    ["Platform Played", c.platform || "Any"],
+    ["Favorites only", c.favorite ? "Yes" : "No"],
+    ["Game Category", behaviour.categoryFilter ? (c.category || "Any") : "filter off"],
+    ["Sort", v.sort.label + (c.unknownSort ? ` (asked for "${c.unknownSort}")` : "")],
+    ["Showing", v.view === "list" ? `Page ${v.page} of ${v.numPages}` : "Page not found"],
+    ["Total matches", String(v.total)],
+  ];
+  if (c.q) facts.push(["Rows before distinct()", `${v.rowsBeforeDistinct} → ${v.total} entries`]);
+  $("facts").innerHTML = facts.map(([k, val]) => `<div class="fact"><small>${esc(k)}</small><span>${esc(val)}</span></div>`).join("");
+  $("changes").innerHTML = `<strong>What just happened</strong><ul>${describeChanges(v).map((l) => `<li>${l}</li>`).join("")}</ul>`;
+  const explain = [...v.explain];
+  if (v.audit) {
+    explain.push(`Tie-breakers are off. Across all pages, ${v.audit.dupes.length} entr${v.audit.dupes.length === 1 ? "y appears" : "ies appear"} on two pages and ${v.audit.missing.length} never appear${v.audit.missing.length === 1 ? "s" : ""}.` +
+      (v.audit.missing.length ? ` Missing: ${v.audit.missing.map((e) => e.title).join(", ")}.` : ""));
+  }
+  $("explain").hidden = !explain.length;
+  $("explain").innerHTML = `<strong>Rules applied</strong><ul>${explain.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`;
+
+  // Controls reflect the address
+  $("q").value = raw.q || "";
+  fillSelect($("f-status"), [["", "Any status"], ...Model.STATUSES], c.status);
+  fillSelect($("f-platform"), [["", "Any platform"], ...Model.platformsPlayed().map((p) => [p, p])], c.platform);
+  fillSelect($("f-category"), [["", "Any category"], ...Model.CATEGORIES.map((x) => [x, x])], c.category);
+  $("f-category").disabled = !behaviour.categoryFilter;
+  $("f-favorite").checked = c.favorite;
+  fillSelect($("sort"), Model.SORTS.map((s) => [s.key, s.label]), v.sort.key);
+
+  $("banner").innerHTML = v.userNotices.map((n) => `<div class="banner">${esc(n)}</div>`).join("");
+
+  // Results
+  if (v.view === "notfound") {
+    $("results").innerHTML = `<div class="notfound"><h2>Page not found</h2><p class="muted">That page of your saved games doesn't exist.</p><button id="nf-first">Go to page 1</button></div>`;
+    $("nf-first").onclick = () => act("Clicked Go to page 1.", Model.goToPage(raw, 1));
+  } else {
+    const first = v.total ? v.start + 1 : 0, last = v.start + v.pageEntries.length;
+    const col = v.sort.column, th = (k, label) => `<th class="${col === k ? "sorted" : ""}">${label}</th>`;
+    const td = (k, html, cls = "") => `<td class="${cls} ${col === k ? "sorted" : ""}">${html}</td>`;
+    const rows = v.pageEntries.map((e, i) => {
+      const why = v.reasons[e.id] ? `<span class="why">Matched in: ${esc(v.reasons[e.id].join(", "))}</span>` : "";
+      const tie = v.ties[e.id] ? `<span class="tie">${esc(v.ties[e.id])}</span>` : "";
+      const dup = v.audit && v.audit.seen[e.id] && v.audit.seen[e.id].length > 1 ? `<span class="dup">Also shown on page ${v.audit.seen[e.id].filter((p) => p !== v.page).join(", ")}</span>` : "";
+      const cat = e.category !== "Main Game" ? `<span class="cat">${esc(e.category)}</span>` : "";
+      return `<tr><td class="muted">${v.start + i + 1}</td>
+        ${td("game", `<strong>${esc(e.title)}</strong>${cat}${why}${tie}${dup}`, "game")}
+        <td>${esc(Model.statusLabel(e.status))}</td><td>${fmt(e.platformPlayed)}</td><td>${e.favorite ? "★" : ""}</td>
+        ${td("rating", fmt(e.rating))}${td("hours", fmt(e.hours))}${td("released", e.released ? esc(e.released) : '<span class="muted">Unknown</span>')}
+        ${td("added", esc(e.added))}${td("updated", esc(e.updated))}<td class="muted">${e.id}</td></tr>`;
+    }).join("");
+    const pageBtns = [];
+    pageBtns.push(`<button data-page="${v.page - 1}" ${v.page <= 1 ? "disabled" : ""}>‹ Previous</button>`);
+    for (let p = 1; p <= v.numPages; p++) pageBtns.push(`<button data-page="${p}" class="${p === v.page ? "cur" : ""}">${p}</button>`);
+    pageBtns.push(`<button data-page="${v.page + 1}" ${v.page >= v.numPages ? "disabled" : ""}>Next ›</button>`);
+    $("results").innerHTML = `
+      <p class="count">${v.total ? `Showing ${first}–${last} of ${v.total} saved game${v.total === 1 ? "" : "s"}` : "No saved games match."}</p>
+      ${v.total ? `<div class="tablewrap"><table><thead><tr><th>#</th>${th("game", "Game")}<th>Status</th><th>Platform Played</th><th>Fav</th>
+        ${th("rating", "Rating")}${th("hours", "Hours")}${th("released", "Released")}${th("added", "Added")}${th("updated", "Updated")}<th>ID</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>` : ""}
+      <div class="pager">${pageBtns.join("")}</div>`;
+    document.querySelectorAll("#results [data-page]").forEach((btn) =>
+      btn.onclick = () => act(`Clicked page ${btn.dataset.page}.`, Model.goToPage(raw, +btn.dataset.page)));
+  }
+
+  prev = { url: Model.buildQuery(raw) || "(empty)", total: v.total, view: v.view, page: v.page, numPages: v.numPages, sortKey: v.sort.key };
+  renderWalk();
+}
+
+// Free-play controls
+$("go-search").onclick = () => act(`Searched for "${$("q").value.trim()}".`, Model.search(raw, $("q").value, behaviour));
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go-search").click(); });
+$("f-status").onchange = (e) => act(`Status filter set to ${e.target.value ? Model.statusLabel(e.target.value) : "Any"}.`, Model.setFilter(raw, "status", e.target.value, behaviour));
+$("f-platform").onchange = (e) => act(`Platform Played filter set to ${e.target.value || "Any"}.`, Model.setFilter(raw, "platform", e.target.value, behaviour));
+$("f-category").onchange = (e) => act(`Game Category filter set to ${e.target.value || "Any"}.`, Model.setFilter(raw, "category", e.target.value, behaviour));
+$("f-favorite").onchange = (e) => act(`Favorites only ${e.target.checked ? "ticked" : "unticked"}.`, Model.setFilter(raw, "favorite", e.target.checked ? "1" : "", behaviour));
+$("sort").onchange = (e) => act(`Sort set to ${Model.sortDef(e.target.value).label}.`, Model.setSort(raw, e.target.value, behaviour));
+$("clear").onclick = () => act("Clicked Clear filters.", Model.clearFilters(raw, behaviour));
+$("addr-go").onclick = () => { const t = $("addr-in").value; act(`Typed "${t}" into the address bar.`, Model.parseQuery(t)); };
+$("addr-in").addEventListener("keydown", (e) => { if (e.key === "Enter") $("addr-go").click(); });
+const CHIPS = ["?page=2", "?page=abc", "?page=0", "?page=-1", "?page=2.5", "?page=3", "?page=4", "?page=99", "?q=pc&page=3", "?sort=banana", "?sort=rating", "?sort=banana&page=2", "?status=finished"];
+$("chips").innerHTML = CHIPS.map((c) => `<button data-q="${esc(c)}">${esc(c)}</button>`).join("");
+document.querySelectorAll("#chips button").forEach((b) => b.onclick = () => act(`Typed "${b.dataset.q}" into the address bar.`, Model.parseQuery(b.dataset.q)));
+
+// ---------- Guided walkthroughs ----------
+const typed = (t) => ({ label: `Type ${t} in the address bar`, run: () => Model.parseQuery(t), say: `Typed "${t}" into the address bar.` });
+const WALKS = [
+  { id: "reverse", title: "Reverse the title sort",
+    text: "Search and filter, then flip the title sort. Only the order should change.",
+    watch: "Total matches stays at 4 in both directions, and the list order flips exactly.",
+    steps: [
+      { label: 'Search "indie"', run: (r, b) => Model.search(r, "indie", b) },
+      { label: "Platform Played: Nintendo Switch", run: (r, b) => Model.setFilter(r, "platform", "Nintendo Switch", b) },
+      { label: "Sort: Title A to Z", run: (r, b) => Model.setSort(r, "title", b) },
+      { label: "Sort: Title Z to A", run: (r, b) => Model.setSort(r, "-title", b) },
+    ] },
+  { id: "tie", title: "Rating tie across the page break",
+    text: "Five games are rated 7. With Rating (Highest First) they sit at positions 11–15, across the page 1/2 break. Doom and DOOM also tie at 8, and their titles differ only by case.",
+    watch: "Orange labels mark the tie. With tie-breakers on, page 1 ends with Dark Souls and Mario Kart, and page 2 starts with Portal 2: nothing repeats and nothing goes missing. Doom (ID 6) comes before DOOM (ID 7). Then turn tie-breakers off: Dark Souls: Remastered shows up on both page 1 and page 2, Mario Kart 8 Deluxe never appears, and the Rules box counts every repeat and skip.",
+    steps: [
+      { label: "Sort: Rating (Highest First)", run: (r, b) => Model.setSort(r, "-rating", b) },
+      { label: "Go to page 2", run: (r) => Model.goToPage(r, 2) },
+      { label: "Back to page 1", run: (r) => Model.goToPage(r, 1) },
+      { label: "Turn tie-breakers off (simulation)", run: (r) => r, setBehaviour: { tieBreakers: false } },
+      { label: "Go to page 2", run: (r) => Model.goToPage(r, 2) },
+      { label: "Turn tie-breakers back on", run: (r) => r, setBehaviour: { tieBreakers: true } },
+    ] },
+  { id: "double", title: "One entry, two matches",
+    text: "Street Fighter II is on the Arcade platform and in the Arcade genre. One search term matches both.",
+    watch: "Street Fighter II appears once, with “Matched in: platform: Arcade, genre: Arcade”. The state panel shows how many joined rows distinct() collapses (4 rows → 2 entries). “nintendo” shows the same effect on a bigger scale, and Hades II (Switch and Switch 2) still appears once.",
+    steps: [
+      { label: 'Search "arcade"', run: (r, b) => Model.search(r, "arcade", b) },
+      { label: 'Search "nintendo"', run: (r, b) => Model.search(r, "nintendo", b) },
+    ] },
+  { id: "page3", title: "Change things from page 3",
+    text: "Run this once with “Goes back to page 1” and once with “Keeps the current page” (behaviour 2).",
+    watch: 'Searching "pc" leaves 20 matches (2 pages). Back-to-page-1 lands on page 1, and keep-the-page clamps 3 down to 2. Then go to page 2 and change the sort: does staying on page 2 of a new order make sense, or is it disorienting?',
+    steps: [
+      { label: "Go to page 3", run: (r) => Model.goToPage(r, 3) },
+      { label: 'Search "pc"', run: (r, b) => Model.search(r, "pc", b) },
+      { label: "Go to page 2", run: (r) => Model.goToPage(r, 2) },
+      { label: "Sort: Title A to Z", run: (r, b) => Model.setSort(r, "title", b) },
+      { label: "Tick Favorites only", run: (r, b) => Model.setFilter(r, "favorite", "1", b) },
+    ] },
+  { id: "clear", title: "Clear filters",
+    text: "Set up a search, a filter and a non-default sort, then press Clear filters. Run it with each of the three Clear filters choices.",
+    watch: "Which parts of the address survive? Search, sort and page are the parts that differ between the choices.",
+    steps: [
+      { label: 'Search "pc"', run: (r, b) => Model.search(r, "pc", b) },
+      { label: "Status: Playing", run: (r, b) => Model.setFilter(r, "status", "playing", b) },
+      { label: "Sort: Title Z to A", run: (r, b) => Model.setSort(r, "-title", b) },
+      { label: "Clear filters", run: (r, b) => Model.clearFilters(r, b) },
+    ] },
+  { id: "badpage", title: "Bad page numbers",
+    text: "Invalid values (3a) and out-of-range values (3b) are separate choices. Try different combinations.",
+    watch: "Which feels right when someone mistypes a page, and which when an old link or bookmark points past the end (for example, after deleting games)?",
+    steps: [typed("?page=abc"), typed("?page=0"), typed("?page=-1"), typed("?page=99"), typed("?page=4"), typed("?q=pc&page=3")] },
+  { id: "sort", title: "Unknown sort",
+    text: "Try both choices for behaviour 4.",
+    watch: "“sort=rating” is unknown too: only the seven listed sorts are allowed, and Rating is “-rating”. After the last step, changing a filter removes the bad sort from the address.",
+    steps: [typed("?sort=banana"), typed("?sort=rating"), typed("?sort=banana&page=2"),
+      { label: "Status: Completed", run: (r, b) => Model.setFilter(r, "status", "completed", b) }] },
+  { id: "category", title: "Game Category filter",
+    text: "Not decided yet. Try it to see whether it's worth having on the page.",
+    watch: "With the filter off, an old link containing category=… is ignored, and the Rules box says so.",
+    steps: [
+      { label: "Turn the Game Category filter on", run: (r) => r, setBehaviour: { categoryFilter: true } },
+      { label: "Game Category: Remaster", run: (r, b) => Model.setFilter(r, "category", "Remaster", b) },
+      { label: "Game Category: Expansion", run: (r, b) => Model.setFilter(r, "category", "Expansion", b) },
+      { label: "Turn the filter off again", run: (r) => r, setBehaviour: { categoryFilter: false } },
+    ] },
+];
+let activeWalk = WALKS[0].id, stepIndex = 0;
+
+function startWalk(id) {
+  activeWalk = id; stepIndex = 0;
+  if (id === "tie") behaviour.tieBreakers = true;
+  renderBehaviour();
+  act(`Started walkthrough “${WALKS.find((w) => w.id === id).title}”. The page is reset; your behaviour choices are kept.`, {});
+}
+
+function renderWalk() {
+  $("tabs").innerHTML = WALKS.map((w) => `<button role="tab" data-walk="${w.id}" class="${w.id === activeWalk ? "on" : ""}">${esc(w.title)}</button>`).join("");
+  document.querySelectorAll("#tabs [data-walk]").forEach((b) => b.onclick = () => startWalk(b.dataset.walk));
+  const w = WALKS.find((x) => x.id === activeWalk);
+  $("walk").innerHTML = `<p>${esc(w.text)}</p><div class="watch"><strong>Watch for:</strong> ${esc(w.watch)}</div>
+    <div class="steps">${w.steps.map((s, i) => `<button data-step="${i}" class="${i < stepIndex ? "done" : i === stepIndex ? "next" : ""}" ${i === stepIndex ? "" : "disabled"}>${i + 1}. ${esc(s.label)}${i < stepIndex ? " ✓" : ""}</button>`).join("")}
+    <button id="walk-restart">↺ Restart this walkthrough</button></div>`;
+  document.querySelectorAll("#walk [data-step]").forEach((b) => b.onclick = () => {
+    const s = w.steps[+b.dataset.step];
+    if (s.setBehaviour) { Object.assign(behaviour, s.setBehaviour); renderBehaviour(); }
+    stepIndex++;
+    act(s.say || `Walkthrough step: ${s.label}.`, s.run(raw, behaviour));
+  });
+  $("walk-restart").onclick = () => startWalk(w.id);
+}
+
+renderBehaviour();
+render();
+</script>
+</body>
+</html>
