@@ -88,12 +88,13 @@ Durable decisions that apply across all phases:
   - `/admin/`
   - `<id>` in `/games/<id>/` is the **Entry** ID (the user's saved entry), not the Game's or IGDB's ID. Every entry lookup goes through one owner-scoped helper, so another user's entry ID returns 404.
 - **Models** (in `games`):
-  - `Game`: unique IGDB ID, name, slug, summary, first release date (nullable date), Game Category (stored in IGDB's game-type terms, values fixed in Phase 1), cover image ID, IGDB URL, last-fetched timestamp. Many-to-many to `Platform`, `Genre` and `Theme`, each with a unique IGDB ID and a name.
+  - `Game`: unique IGDB ID, name, slug, summary, first release date (nullable date), Game Category (IGDB `game_type` ID, labels and allowlist fixed in Phase 1), version parent (nullable IGDB game ID from `version_parent`), cover image ID, IGDB URL, last-fetched timestamp. Many-to-many to `Platform`, `Genre` and `Theme`, each with a unique IGDB ID and a name.
   - `Entry`: owner (FK to user), game (FK to `Game`, deleting an entry never deletes the Game), status (text choices, default Want to Play), favorite (default false), rating (nullable 1–10), notes, platform played (plain text, not an FK), start and finish dates (nullable), hours played (nullable, not negative), created and updated timestamps. Unique constraint on (owner, game).
 - **Auth**: Django sessions for the website (sign-up signs you in, login lands on My Saved Games, safe `next` is honored). For the API, DRF `TokenAuthentication` then `SessionAuthentication`, with `IsAuthenticated` by default, so a missing token gives 401. Owner is always set from the authenticated user.
 - **Query logic shared by website and API**: one saved-entries query builder (search, filters, sorts, tie-breakers, distinct). The website parses parameters **forgivingly** and the API **strictly** (prototype Option A). Page size is **10** in both.
 - **Shared validation**: one validation function, used by the website form and the API serializer, covering dates and platform played (including the rule that a stale value may stay unchanged).
-- **IGDB boundary**: one client module, called only from the server. It raises a typed error carrying a safe message and one of the PRD's error codes. The Twitch token is cached in Django's local-memory cache. Edition and bundle exclusions (and any types Phase 1 excludes) go in the IGDB query's `where` clause, not in a filter after the results come back, so the "ask for 11, show 10" Next rule stays accurate.
+- **IGDB boundary**: one client module, called only from the server. It raises a typed error carrying a safe message and one of the PRD's error codes. The Twitch token is cached in Django's local-memory cache. The Phase 1 eligibility rule goes in the IGDB query's `where` clause, not in a filter after the results come back, so the "ask for 11, show 10" Next rule stays accurate: `where version_parent = null & game_type = (0,1,2,4,6,7,8,9,10,11,12);`. The same rule, as one Python function, checks fetched records and stored Games in the save service.
+- **Game Category (approved in Phase 1)**: keep Main Game (0, no badge), DLC (1), Expansion (2), Standalone Expansion (4), Episode (6), Season (7), Remake (8), Remaster (9), Expanded Game (10), Port (11) and Fork (12), with IGDB's labels as badges. Exclude Bundle (3), Mod (5), Pack / Addon (13), Update (14), any future type until reviewed, and any record with a version parent. Excluded message: "This release can't be saved. Search for the base game or a supported release."
 - **Environment (`.env`, git-ignored; `.env.example` placeholders added in the phase that first needs them)**: `DJANGO_SECRET_KEY`, `DJANGO_DEBUG` (Phase 2), demo password (Phase 3), `GAME_TRACKER_API_URL` (optional, default `http://127.0.0.1:8000/api/`) and `GAME_TRACKER_TOKEN` for `scripts/entries_client.py` (Phase 11), alongside the existing `IGDB_CLIENT_ID` and `IGDB_CLIENT_SECRET`.
 
 ---
@@ -125,10 +126,12 @@ The live queries run from a one-off script kept in the session scratchpad, which
 
 ### Acceptance criteria
 
-- [ ] The field name and full value list are confirmed from both the docs and a live request (or the note marks clearly which source was blocked).
-- [ ] The Witcher 3, Dark Souls III and Resident Evil 2 outcomes match the PRD (or the differences are written down for my decision).
-- [ ] Every game type has a keep or exclude decision and a badge label, and I have approved them.
-- [ ] The PRD's open items are updated. No credentials or tokens appear in the note, the PRD or PROMPTS.md.
+- [x] The field name and full value list are confirmed from both the docs and a live request (or the note marks clearly which source was blocked).
+- [x] The Witcher 3, Dark Souls III and Resident Evil 2 outcomes match the PRD (or the differences are written down for my decision).
+- [x] Every game type has a keep or exclude decision and a badge label, and I have approved them.
+- [x] The PRD's open items are updated. No credentials or tokens appear in the note or the PRD. (PROMPTS.md is checked when the session log is written.)
+
+**Result (2026-11-14):** see [docs/research/igdb-game-types.md](../docs/research/igdb-game-types.md). The decisions are recorded under "Game Category (approved in Phase 1)" in the architectural decisions above. A possible IGDB search-ordering issue is recorded as unconfirmed and gets checked in Phase 7.
 
 ### Automated checks
 
@@ -395,7 +398,7 @@ Standard checks, plus query-builder tests (each field, distinct, each filter, th
 
 **User stories**: 6, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 107, 108, 109, 110, 111, 112, 113, 114
 
-**Goal**: Search IGDB from the site, with editions and bundles excluded (plus any types Phase 1 excluded), badges, "Saved" links, a correct pager, and clear, safe messages when Twitch or IGDB fails.
+**Goal**: Search IGDB from the site, with only eligible releases shown (the Phase 1 allowlist, with no version parent), badges, "Saved" links, a correct pager, and clear, safe messages when Twitch or IGDB fails.
 
 **Dependencies**: Phase 1 (approved rules and `where` clause), Phase 3 (models and owner helper for Saved links).
 
@@ -414,7 +417,8 @@ The IGDB client module, built on the verification script's request, timeout and 
 
 - [ ] A cached token is reused. A new one is fetched after cache expiry. A 401 triggers exactly one refresh and retry, and a second 401 isn't retried and shows the misconfiguration message.
 - [ ] Timeout, unreachable, 429 and 5xx each show their exact PRD message, with no retry and with the My Saved Games link.
-- [ ] The outgoing query contains the agreed exclusions, limit 11 and the correct offset.
+- [ ] The outgoing query contains exactly the Phase 1 `where` clause, limit 11 and the correct offset.
+- [ ] **IGDB ordering check (live, resolves the unconfirmed ordering issue):** repeating the exact same search returns the same IDs in the same order on page 1 and on page 2, and no ID appears on both pages. The result is recorded in `docs/verification.md` and the verification note. If ordering isn't stable, the difference is written down for my decision before Phase 7 is committed (for example, adding a `sort` to the query).
 - [ ] Next appears only when 11 results came back. The empty-page messages are correct. Errors never show "No matches.".
 - [ ] Saved results link to the current user's entry only (another user's saved game shows as unsaved for me).
 - [ ] Signed-out visitors are redirected to login and IGDB is never called.
@@ -426,8 +430,9 @@ Standard checks, plus client tests with mocked HTTP (token caching and expiry, o
 
 ### Manual verification (browser, live IGDB with my real `.env`)
 
-1. Search "The Witcher 3": the base game and Blood and Wine (with an Expansion badge) appear, and the Game of the Year Edition doesn't.
-2. Search "Dark Souls III" and "Resident Evil 2": no bundles.
+1. Search "The Witcher 3": the base game and Blood and Wine (with an Expansion badge) appear. The Game of the Year Edition, the Witcher 3 + Dark Souls III bundle, "Wild Hunt Remastered" (an Update) and the Enhanced Edition Redux mod don't.
+2. Search "Dark Souls III" and "Resident Evil 2": no bundles, editions, mods or packs. RE2's ports, remake and remaster show Port, Remake and Remaster badges.
+   - **Ordering check:** search a term with more than 10 eligible results (for example "Resident Evil 2" or "star") and note the IGDB IDs on page 1 and page 2. Repeat exactly the same two requests (same text, same pages) two more times. Record whether the IDs and their order match each time and whether any ID appears on both pages. Do the same in a scratch script with the exact query body if the browser view isn't enough to compare IDs.
 3. Page through a vague search ("star"). Next disappears on the last page, Previous works, the URL updates, and the query stays in the box.
 4. Hand-edit `page=abc` (page 1) and a large page (No more results, with a page-1 link). Search nonsense: "No matches.".
 5. As demo user A, a seeded game shows "Saved" with a link to A's entry. As B, the same game shows as unsaved.
@@ -452,8 +457,8 @@ Standard checks, plus client tests with mocked HTTP (token caching and expiry, o
 
 The save service (reused by the API in Phase 10):
 
-1. **Game already stored**: if its stored Game Category is excluded, reject with `game_category_excluded` without calling IGDB. Otherwise reuse it.
-2. **New game**: fetch by IGDB ID (applying the Game Category rules, so an edition or bundle ID sent directly is rejected), then save the Game, its platform, genre and theme links, and the Entry in one transaction. The fetch happens first, so a failure saves nothing.
+1. **Game already stored**: if its stored version parent is set or its stored Game Category isn't on the allowlist, reject with `game_category_excluded` without calling IGDB. Otherwise reuse it.
+2. **New game**: fetch by IGDB ID and apply both eligibility checks (version parent empty, Game Category on the allowlist), so an excluded ID sent directly is rejected. then save the Game, its platform, genre and theme links, and the Entry in one transaction. The fetch happens first, so a failure saves nothing.
 3. **Unknown ID**: `igdb_game_not_found`.
 4. **Integrity error on Entry create**: re-check for an entry belonging to **the same user for the same game**. Only a confirmed entry counts as a duplicate. Anything else is an unexpected error shown only as a generic safe message.
 
@@ -468,7 +473,7 @@ The save service (reused by the API in Phase 10):
 - [ ] A new save creates the Game, its links, and an entry with Want to Play and not favorite, then lands on edit.
 - [ ] Saving again gives "Already in your games" on the existing entry. A simulated simultaneous save (integrity error) never creates two entries and is reported as a duplicate only when the same user's entry exists.
 - [ ] With the IGDB client failing, saving a game already stored by another user succeeds with no IGDB call, and saving a new game shows the error and leaves no Game, link or Entry rows.
-- [ ] Posting an edition or bundle IGDB ID directly is rejected, and so is a stored Game whose stored category is excluded (without an IGDB call).
+- [ ] Posting an excluded IGDB ID directly is rejected with "This release can't be saved. Search for the base game or a supported release." Test cases: a version-parent edition typed Main Game (DS3 Day One Edition), a Bundle, a Mod, a Pack / Addon, an Update, and an unknown future type ID. A stored Game with a stored version parent, or a stored Game Category off the allowlist, is also rejected (without an IGDB call).
 - [ ] Failure redirects keep `q` and `page`, and the message shows even when the results reload also fails.
 - [ ] GET on `/search/save/` is rejected. Signed-out POST redirects to login. The owner always comes from the session.
 
@@ -494,7 +499,7 @@ Standard checks, plus save-service tests (new, reuse, stored-excluded, excluded 
    6. **Save the new game.** Back on the results page (from Back, or the error redirect), click Save on it. You return to the search URL with the clear outage or configuration message and the My Saved Games link. The message shows even though the results can't reload.
    7. **Check for no partial save.** My Saved Games for B shows only the existing game added. In admin, the new game's IGDB ID is still absent from Games, and there are no new Platform, Genre or Theme rows from it.
    8. **Reset for the next run.** Restore Wi-Fi (or remove the dummy credential overrides), then delete B's entry for the existing game through the confirmation page. The shared Game stays, so the check can be repeated with the same search.
-5. In DevTools, change a Save form's `igdb_id` to The Witcher 3 GOTY's ID and submit: "Editions and bundles can't be saved…".
+5. In DevTools, change a Save form's `igdb_id` to The Witcher 3 GOTY's ID (22439) and submit: "This release can't be saved. Search for the base game or a supported release." Repeat with Dark Souls III: Day One Edition (89841, typed Main Game but with a version parent).
 
 ### Commit
 
@@ -517,7 +522,8 @@ A "Refresh from IGDB" button on the detail page that POSTs to `/games/<id>/refre
 - **Throttle**: one attempt per game per 10 minutes across all users, recorded in the cache per attempt (failures count too). A throttled refresh shows a message and makes no IGDB call.
 - **Success**: updates Game metadata, platform, genre and theme links, and last-fetched in one transaction.
 - **Failure**: keeps everything and shows the PRD message with the My Saved Games link.
-- **Reclassified as excluded**: stores the new category and keeps all entries. Later saves are rejected by the Phase 8 stored-classification rule.
+- **Eligibility fields**: every successful refresh updates both the Game Category and the version parent.
+- **Becomes ineligible**: stores the new values and keeps all entries and their tracking data. Later saves are rejected by the Phase 8 stored-classification rule.
 
 A detail-page warning appears when the entry's platform played is no longer in the game's platforms. The value is kept.
 
@@ -526,7 +532,7 @@ A detail-page warning appears when the entry's platform played is no longer in t
 - [ ] A successful refresh updates the details and the "last refreshed" time, and the entry's tracking fields are unchanged.
 - [ ] A failed refresh changes nothing and shows the right message.
 - [ ] A second refresh of the same game within 10 minutes (by any user, even after a failure) is throttled, with no IGDB call.
-- [ ] Reclassification to an edition or bundle keeps entries and tracking data, and a later save of that game is rejected without an IGDB call.
+- [ ] A refresh that makes the game ineligible (a version parent appears, or the Game Category leaves the allowlist) stores both new values and keeps entries and tracking data. A later save of that game is rejected without an IGDB call.
 - [ ] A removed platform is kept on the entry with a warning, and editing other fields still works.
 - [ ] As the owner, GET on the refresh URL returns 405, with no IGDB call and no attempt recorded. Another user's POST returns 404, with no IGDB call, no attempt recorded and A's data unchanged.
 
@@ -690,7 +696,7 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 
 ## Phase checklist
 
-- [ ] Phase 1: Verify IGDB game types (live verification and documentation checkpoint)
+- [x] Phase 1: Verify IGDB game types (live verification and documentation checkpoint)
 - [ ] Initial root `CLAUDE.md` (before the first `/implement` phase)
 - [ ] Phase 2: Project skeleton, accounts and site layout
 - [ ] Phase 3: Models, admin, demo seed and basic My Saved Games

@@ -10,7 +10,7 @@ Game databases like IGDB have the facts (titles, platforms, release dates, cover
 
 A Django website and REST API where a signed-in user can:
 
-- **Search IGDB** for games by title. Editions and bundles are left out. Expansions, DLC, standalone expansions, remakes and remasters stay in, each marked with a Game Category badge. Games the user has already saved are marked "Saved" and linked to their entry.
+- **Search IGDB** for games by title. Editions (any record with a version parent), bundles, mods, packs and updates are left out. DLC, expansions, standalone expansions, episodes, seasons, remakes, remasters, expanded games, ports and forks stay in, each marked with a Game Category badge. Games the user has already saved are marked "Saved" and linked to their entry.
 - **Save a game** to their own list. The app stores the game's IGDB details locally (title, summary, release date, platforms, genres, themes, cover reference, Game Category, IGDB link), so the list stays browsable when IGDB is down.
 - **Track and edit** their own status, favorite flag, rating, notes, platform played, start and finish dates, and hours played.
 - **Browse their saved games** with search across several fields, filters (Status, Platform Played, Favorite, Theme), seven sort options, and 10 entries per page, all from the local database.
@@ -39,9 +39,9 @@ Saved entries are private: each user sees and changes only their own, and attemp
 ### Finding games through IGDB
 
 12. As a user, I want to search IGDB by game title, so that I can find the game I want to track.
-13. As a user, I want editions (such as Game of the Year or Complete editions) and bundles left out of search results, so that I don't save near-duplicates of the same game.
-14. As a user, I want DLC, expansions, standalone expansions, remakes and remasters kept in results, so that I can track them separately from the base game.
-15. As a user, I want a Game Category badge such as "Expansion", "Remake" or "Remaster" on results that aren't main games, so that I can tell them apart at a glance.
+13. As a user, I want editions (such as Game of the Year or Complete editions), bundles, mods, packs and updates left out of search results, so that I don't save near-duplicates or add-ons of the same game.
+14. As a user, I want DLC, expansions, standalone expansions, episodes, seasons, remakes, remasters, expanded games, ports and forks kept in results, so that I can track them separately from the base game.
+15. As a user, I want a Game Category badge such as "Expansion", "Remake", "Remaster" or "Port" on results that aren't main games, so that I can tell them apart at a glance.
 16. As a user, I want each result to show its cover, title, release date and platforms, so that I can pick the right game.
 17. As a user, I want results I've already saved to show a "Saved" link to my entry instead of a Save button, so that I don't try to save them twice.
 18. As a user, I want up to 10 results per page with Previous and Next links, so that I can look past the first results for vague searches.
@@ -64,7 +64,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
 32. As a user, I want a failed save to return me to the same search results and page with an error message, so that I can try again without searching again.
 33. As a user, I want to see the save error even if the search results can't be reloaded, so that I always know what went wrong.
 34. As a user, I want a failed save to leave nothing half-saved, so that my list never contains broken entries.
-35. As a user, I want editions and bundles refused when saving, even if their IDs are sent directly, so that the search filter can't be bypassed.
+35. As a user, I want excluded releases (editions, bundles, mods, packs, updates and any unreviewed type) refused when saving, even if their IDs are sent directly, so that the search filter can't be bypassed.
 
 ### Tracking my games
 
@@ -116,7 +116,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
 75. As a user, I want a failed refresh to keep the existing details and show the usual error message, so that a refresh never damages my data.
 76. As a user, I want repeated refreshes of the same game limited to one every 10 minutes across all users, so that the app doesn't use up its IGDB allowance.
 77. As a user, I want "Data from IGDB" with a link and the last successful refresh time on the detail page, so that I know where the data came from and how fresh it is.
-78. As a user, I want my entry and tracking data kept if a refresh reclassifies the game as an edition or bundle, so that I never lose my history.
+78. As a user, I want my entry and tracking data kept if a refresh makes the game ineligible for new saves (for example, it becomes an edition or an excluded type), so that I never lose my history.
 79. As a user, I want my saved platform kept, with a warning, if a refresh removes it from the game's platforms, so that my data isn't silently changed.
 80. As a user, I want to keep editing my other tracking fields while that stale platform is kept, and to have to pick a currently listed platform (or blank) if I change it, so that I'm never forced to fix something just to edit notes.
 
@@ -142,7 +142,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
 95. As an API client, I want changing the IGDB ID on update rejected, so that an entry always tracks the game it was created for.
 96. As an API client, I want DELETE to return 204 and keep the shared game, so that removing an entry behaves like the website.
 97. As an API client, I want 503 with a {"detail", "code"} body when IGDB or Twitch prevents a save, and IGDB's Retry-After passed on for rate limits, so that I know to try again later.
-98. As an API client, I want 400 with a {"detail", "code"} body for an unknown IGDB ID, an excluded edition or bundle, or a duplicate entry, so that I know to change my request.
+98. As an API client, I want 400 with a {"detail", "code"} body for an unknown IGDB ID, an excluded release, or a duplicate entry, so that I know to change my request.
 99. As an API client, I want field-level validation errors in DRF's standard format, so that I can see which field is wrong.
 100. As a developer, I want documented example create and PATCH requests and responses, so that I can use the API without reading its code.
 
@@ -186,7 +186,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
 
 ### Data model
 
-- **Game**: one row per IGDB game, shared by all users. Fields: IGDB ID (unique), name, slug, summary, first release date (nullable date converted from IGDB's Unix timestamp), Game Category (stored using IGDB's game-type terminology once verified), cover image ID, IGDB URL, and last-fetched timestamp. Read-only to users.
+- **Game**: one row per IGDB game, shared by all users. Fields: IGDB ID (unique), name, slug, summary, first release date (nullable date converted from IGDB's Unix timestamp), Game Category (IGDB's `game_type` ID), version parent (nullable IGDB game ID from `version_parent`), cover image ID, IGDB URL, and last-fetched timestamp. Read-only to users.
 - **Platform**, **Genre**, **Theme**: each with a unique IGDB ID and a name, linked to Game by many-to-many relationships. Stored locally so search and filters work offline.
 - **Entry**: the user's tracking data. Fields: owner (user), game, status, favorite, rating, notes, platform played, start date, finish date, hours played, and automatic created and updated timestamps.
   - Status uses text choices with five values: Want to Play (default), Playing, Completed, On Hold, Dropped.
@@ -227,9 +227,33 @@ Saved entries are private: each user sees and changes only their own, and attemp
 
 ### Game Category rules
 
-- IGDB search and import exclude editions (records with a version parent) and bundles. DLC, expansions, standalone expansions, remakes and remasters are kept.
-- The UI calls this "Game Category" (and "Game Categories" for the group). Non-main games show a badge such as "Expansion", "Remake" or "Remaster" on the search and saved-games pages. There is no Game Category filter.
-- **Open until verified:** the exact IGDB field (expected to be `game_type`), its values, and how the remaining types (ports, expanded games, episodes, seasons, mods, packs, updates) are treated. The working suggestion is to keep ports, expanded games, episodes and seasons, and exclude mods, packs and updates, to be confirmed after verification.
+- **Verified 2026-11-14** (see [docs/research/igdb-game-types.md](../docs/research/igdb-game-types.md)): the type field is `game_type`, a reference to the `/v4/game_types` endpoint. The older `category` field is deprecated and empty.
+- **Eligibility rule (allowlist).** A game is eligible for search and new saves only if **both** are true:
+  - `version_parent` is empty (records with a version parent are editions), and
+  - `game_type` is one of the kept types below.
+
+  Excluded: Bundle (3), Mod (5), Pack / Addon (13), Update (14), and any type IGDB adds in future until it's reviewed.
+
+  | ID | IGDB label | Treatment | Badge |
+  |---:|---|---|---|
+  | 0 | Main Game | Keep | none |
+  | 1 | DLC | Keep | DLC |
+  | 2 | Expansion | Keep | Expansion |
+  | 4 | Standalone Expansion | Keep | Standalone Expansion |
+  | 6 | Episode | Keep | Episode |
+  | 7 | Season | Keep | Season |
+  | 8 | Remake | Keep | Remake |
+  | 9 | Remaster | Keep | Remaster |
+  | 10 | Expanded Game | Keep | Expanded Game |
+  | 11 | Port | Keep | Port |
+  | 12 | Fork | Keep | Fork |
+  | 3 | Bundle | Exclude | |
+  | 5 | Mod | Exclude | |
+  | 13 | Pack / Addon | Exclude | |
+  | 14 | Update | Exclude | |
+
+- IGDB search and import both use `where version_parent = null & game_type = (0,1,2,4,6,7,8,9,10,11,12);`. The save service applies the same rule in Python to a fetched record and to a Game already stored locally.
+- The UI calls this "Game Category" (and "Game Categories" for the group). Badges use IGDB's labels, and Main Game has no badge. Badges appear on the search and saved-games pages. There is no Game Category filter.
 
 ### IGDB search page
 
@@ -242,8 +266,8 @@ Saved entries are private: each user sees and changes only their own, and attemp
 
 - The website save form and API create both accept an IGDB ID and use the same save service.
 - If the Game already exists locally, it is reused with no IGDB call, so saving works during an outage.
-- **Stored-classification rule:** if the stored Game's Game Category is excluded (for example, after a refresh reclassified it as an edition or bundle), new saves are rejected using the stored classification, without calling IGDB. Existing entries for that game are untouched.
-- For a new game: fetch it from IGDB by ID, apply the Game Category rules, then save the Game with its platform, genre and theme links and the Entry in one database transaction. The fetch happens first, so an IGDB failure leaves nothing saved.
+- **Stored-classification rule:** if the stored Game is ineligible (its stored version parent is set, or its stored Game Category isn't on the allowlist, for example after a refresh reclassified it), new saves are rejected using the stored values, without calling IGDB. Existing entries for that game are untouched.
+- For a new game: fetch it from IGDB by ID, apply the eligibility rule (both the version parent and the Game Category checks), then save the Game with its platform, genre and theme links and the Entry in one database transaction. The fetch happens first, so an IGDB failure leaves nothing saved.
 - Duplicates: on the website, link or redirect to the existing entry with "Already in your games". In the API, return 400.
 - Simultaneous saves: if creating the Entry raises a database integrity error, the service re-checks for an existing entry belonging to **the same user for the same game**. Only when that entry is confirmed is the request treated as a duplicate (with the duplicate responses above). Any other database error, including an integrity error with no such entry, is not reported as a duplicate. It is handled as an unexpected server error and shown to the user only as a generic safe message.
 - After a successful new save on the website, redirect to the entry's edit page.
@@ -253,7 +277,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
 
 - A POST-only action on the entry detail page, requiring sign-in and an owner-scoped entry lookup.
 - Fetches by IGDB ID. On success, updates the Game's metadata, platform, genre and theme links, and last-fetched time in one transaction. On failure, keeps the existing data and shows the agreed error message.
-- If IGDB reclassifies the game as excluded, the new classification is stored and existing entries and their tracking data are kept. New saves of that game are then rejected under the stored-classification rule.
+- A successful refresh updates both the Game Category and the version parent. If the game becomes ineligible, the new values are stored and existing entries and their tracking data are kept. New saves of that game are then rejected under the stored-classification rule.
 - If a user's platform played is no longer listed, it is kept and a warning is shown on the entry.
 - Throttled to one refresh attempt per game per 10 minutes across all users, tracked in the cache by attempt (not success), so failing refreshes are throttled too.
 - The detail page shows "Data from IGDB" with a link to the game's IGDB page and the last successful refresh time.
@@ -268,7 +292,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
 | `igdb_unavailable` | IGDB is having problems right now. Try again later. | 503 |
 | `igdb_misconfigured` | Game search and imports aren't set up on this server. Your saved games are still available. | 503 |
 | `igdb_game_not_found` | IGDB has no game with that ID. | 400 |
-| `game_category_excluded` | Editions and bundles can't be saved. Search for the base game instead. | 400 |
+| `game_category_excluded` | This release can't be saved. Search for the base game or a supported release. | 400 |
 | duplicate entry | (existing-entry message) | 400 |
 
 - Import and duplicate API errors use a `{"detail": "...", "code": "..."}` body. Tracking-field validation uses DRF's standard field-error format.
@@ -363,7 +387,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
 - Password reset, email, and account management beyond sign-up, login and logout.
 - JWT or other API authentication schemes.
 - Editing shared IGDB metadata (titles, summaries, platforms, genres, themes, covers) by users, through the website or API.
-- A Game Category filter on My Saved Games, and a Game Category filter or toggle on IGDB search (editions and bundles are always excluded).
+- A Game Category filter on My Saved Games, and a Game Category filter or toggle on IGDB search (excluded releases are always left out).
 - Multi-select theme filtering, tags, and a separate games API endpoint.
 - A user-selectable page size, and a page cap or numbered pages (with totals) for IGDB search.
 - Downloading or re-hosting cover images, and offline cover display.
@@ -404,7 +428,8 @@ Saved entries are private: each user sees and changes only their own, and attemp
 
 ### Other verification carried from the design
 
-- Before implementation: verify the IGDB Game Category field and values against the official docs and a live request, using the existing script's plain search as the baseline. A "The Witcher 3" search keeps the base game and Blood and Wine and excludes the Game of the Year Edition. A separate "Dark Souls III" search excludes the bundle. Then settle the remaining types.
+- Before implementation: verify the IGDB Game Category field and values against the official docs and a live request, using the existing script's plain search as the baseline. A "The Witcher 3" search keeps the base game and Blood and Wine and excludes the Game of the Year Edition. A separate "Dark Souls III" search excludes the bundle. Then settle the remaining types. **Done 2026-11-14:** all three outcomes matched, and the types were settled (see Game Category rules).
+- Repeating the exact same IGDB search returns consistent IDs across pages 1 and 2 (no repeats or gaps), or the difference is recorded. Checked in Phase 7.
 - The browsable API works with a signed-in browser session, and the client works with a token.
 - A search where several related values (for example, a platform and a genre) match one entry shows that entry once.
 - Reversing the title sort with the same search and filters changes the order but not the total count. Ties across a page boundary repeat or skip no entries.
@@ -412,7 +437,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
 - Token handling: a cached token is reused, a new one is fetched after cache expiry, a 401 triggers one refresh and retry, a second 401 isn't retried, and saved games work without credentials.
 - Covers: a working cover, a missing cover and a blocked image request each display correctly.
 - PATCH validation checks a new finish date against the stored start date. Stale-platform rules hold on both the website and API.
-- A refresh that reclassifies a game as an edition or bundle keeps existing entries and their tracking data, and a later save attempt for that game is rejected using the stored classification without calling IGDB.
+- A refresh that makes a game ineligible (a version parent appears, or its Game Category leaves the allowlist) stores both new values, keeps existing entries and their tracking data, and a later save attempt for that game is rejected using the stored values without calling IGDB.
 
 ## Further Notes
 
@@ -420,7 +445,8 @@ Saved entries are private: each user sees and changes only their own, and attemp
 - **Verified 2026-11-14:** Horror (IGDB theme 19) and Survival (theme 21) are IGDB themes, not genres. The genre list contains neither. A live "Resident Evil 2" search returned both as themes and also returned a bundle, another real case for the bundle exclusion.
 - **Verified 2026-11-14:** Django 6.1.3's `Paginator.get_page()` sends 0 and −1 to the last page, which is why the website needs its own page-parsing step.
 - **Unresolved: Twitch storage terms.** The IGDB FAQ says local storage is allowed and preferred, but the Twitch Developer Services Agreement it points to has a 24-hour caching clause. It isn't clear whether the FAQ counts as the written authorization that clause allows, or whether the clause covers IGDB at all. The design stores saved metadata, keeps a last-fetched time, and offers manual refresh. The question stays documented as open (see the API comparison research).
-- **Open until verified:** the IGDB Game Category field name (`game_type` expected), its values, and the treatment of the remaining types.
+- **Verified and decided 2026-11-14:** the Game Category field is `game_type` (15 values, IDs 0–14), and editions are identified by `version_parent`, because some editions are typed Main Game (for example *Dark Souls III: Day One Edition*). The keep/exclude allowlist is in the Game Category rules. Evidence: [docs/research/igdb-game-types.md](../docs/research/igdb-game-types.md).
+- **Unconfirmed: IGDB search ordering.** Two logically equivalent "Resident Evil 2" queries returned the same records in a different order. Byte-identical repeated queries haven't been tested. If ordering isn't stable, a result could repeat or be skipped across IGDB search pages. Phase 7 checks this by repeating the exact same search and comparing IDs on pages 1 and 2.
 - **To confirm during planning:** the styling and interactivity choices from the lesson (for example, the CSS approach and any front-end interactivity beyond the cover-fallback script) aren't decided in this PRD and must be confirmed before implementation.
 - Covers are hotlinked rather than downloaded because none of the providers clearly allows re-hosting images.
 - IGDB's limits (4 requests per second, 8 open requests, 25 active tokens, about 60-day token life) shaped the one-request-per-page search, token caching, the single 401 retry and the refresh throttle.

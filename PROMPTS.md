@@ -28,6 +28,47 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-14 — Phase 1: verify IGDB game types and settle the Game Category rules
+
+### Prompts
+1. Read prd/video-game-tracker.md and plans/video-game-tracker.md. Start Phase 1 only: verify IGDB game types using the official docs and a live request. Run the planned Witcher 3, Dark Souls III, and Resident Evil 2 checks. Use the existing IGDB script as the baseline and keep credentials and tokens out of output and documentation. Document the verified field, values, and filter behavior in the repo. Recommend which remaining game types to keep or exclude and show me the evidence for each recommendation. Stop for my review before finalizing those choices, starting Phase 2, staging, committing, or pushing.
+2. I approve the proposed allowlist. Keep Main Game, DLC, Expansion, Standalone Expansion, Episode, Season, Remake, Remaster, Expanded Game, Port, and Fork. Exclude Bundle, Mod, Pack / Addon, Update, and any future type until reviewed. Also exclude any record with a version_parent from search and new saves. Use IGDB's labels for Game Category badges, with no badge for Main Game. Store version_parent as a nullable IGDB ID alongside game_type. Apply both checks when importing a new game and when saving a game already stored locally. Refresh should update both fields and preserve existing entries even if the game becomes ineligible for new saves. Use this error message for an excluded game: "This release can't be saved. Search for the base game or a supported release." Update the verification note, PRD, and plan to reflect these decisions. For Phase 7, add a check that repeats the exact same IGDB search and compares IDs across pages 1 and 2. Record the possible ordering issue as unconfirmed until that check is done. Show me git status --short and summarize the edits. Stop before staging, committing, pushing, or starting Phase 2.
+3. I approve the Phase 1 updates. Append the Phase 1 session log to PROMPTS.md under today's date, newest entry at the top. Record my prompts in order, the three live search checks, the approved allowlist, why we also need version_parent, and the search-order question reserved for Phase 7. After writing the log, verify that it contains no credentials or tokens and that .env remains ignored. Mark Phase 1 complete in the plan's bottom checklist. Stage only PROMPTS.md, docs/research/igdb-game-types.md, prd/video-game-tracker.md, and plans/video-game-tracker.md. Show git status --short and git diff --cached --name-only. Leave the commit and push to me. Stop before creating CLAUDE.md or starting Phase 2.
+
+### Summary
+- **Outcome:**
+  - **Verification note:** wrote `docs/research/igdb-game-types.md`. It has docs quotes, the live type list with counts, the three search checks, per-type evidence, the approved `where` clause, and the downstream decisions.
+  - **Docs facts:** the type field is `game_type`, a reference to `/v4/game_types`. The docs mark `category` "DEPRECATED! Use `game_type` instead", and live it's empty on every record. There are 15 types (IDs 0–14), matching the old `category` enum one-to-one. No game has an empty `game_type`. IGDB applies the `where` clause before the limit, so the "ask for 11, show 10" pager rule stays accurate.
+  - **Three live search checks (all matched the PRD):**
+    - **"The Witcher 3":** kept the base game (1942) and Blood and Wine (13166, Expansion). Excluded the Game of the Year Edition (22439), which is typed Bundle *and* has version parent 1942. The filter also removed the Witcher 3 + Dark Souls III bundle, "Wild Hunt Remastered" (an Update) and the Enhanced Edition Redux mod.
+    - **"Dark Souls III":** excluded all three bundles (the crossover bundle, the Fire Fades Edition and the Deluxe Edition), plus the Day One Edition. The Ringed City and Ashes of Ariandel then appeared.
+    - **"Resident Evil 2":** excluded the RE2 + RE3 bundle. Horror (19) and Survival (21) still came back as themes.
+    - **Baseline:** the unchanged `scripts/igdb_search.py "The Witcher 3"` still exits 0 (8 results).
+  - **Approved allowlist:**
+    - **Kept, with IGDB's labels as badges:** Main Game (0, no badge), DLC (1), Expansion (2), Standalone Expansion (4), Episode (6), Season (7), Remake (8), Remaster (9), Expanded Game (10), Port (11) and Fork (12).
+    - **Excluded:** Bundle (3), Mod (5), Pack / Addon (13), Update (14), any future type until it's reviewed, and any record with a version parent.
+    - **Clause:** `where version_parent = null & game_type = (0,1,2,4,6,7,8,9,10,11,12);`. Live, it matches the deny-list form exactly (352,473 games).
+  - **Why `version_parent` is needed too:** `game_type` alone can't detect editions. Of the 8,108 games with a version parent, 6,944 are typed Main Game, for example *Dark Souls III: Day One Edition* (89841). So `Game` stores the nullable `version_parent` ID alongside `game_type`. Both checks run when importing a new game and when saving a game already stored locally (with no IGDB call in that case). Refresh updates both fields and keeps existing entries if the game becomes ineligible.
+  - **Error message:** the excluded-game message is now "This release can't be saved. Search for the base game or a supported release."
+  - **Search order reserved for Phase 7:** two logically equivalent "Resident Evil 2" queries returned the same records in a different order. Byte-identical repeats weren't tested, so a result might repeat or be skipped across IGDB search pages. This is recorded as **unconfirmed** in the note and the PRD. Phase 7 now has an acceptance criterion and manual step that repeat the exact same search and compare IDs on pages 1 and 2. If ordering isn't stable, it goes to the user before Phase 7 is committed.
+  - **PRD and plan updated:**
+    - **PRD:** Game Category rules (rule, table, clause), data model, stories 13–15, 35, 78 and 98, the save-service and refresh rules, the error table, acceptance criteria, Out of Scope, and Further Notes.
+    - **Plan:** architectural decisions, the Phase 1 acceptance criteria and result, Phases 7–9, and Phase 1 marked complete in the bottom checklist.
+    - **Staged** for the user to commit: the four files above. Nothing committed or pushed. CLAUDE.md and Phase 2 not started.
+- **Deviations:**
+  - **Approvals:** approved every recommendation as proposed, including Fork (which the PRD hadn't listed), keeping Season (my closest call), and the allow-list form of the clause.
+  - **Additions beyond my recommendations:**
+    - Applying both checks to games already stored locally, as well as to new imports.
+    - A specific error message, replacing my suggested wording.
+    - A dedicated Phase 7 check that repeats the exact same search.
+- **Sideways:**
+  - **Docs fetch:** the web-fetch agent got HTTP 403 from `api-docs.igdb.com`, the same as in an earlier session. A plain `curl` GET into the session scratchpad returned the full page, so every docs quote comes from the official page.
+  - **First filtered run:** it left out types 3, 5 and 14 only, so Pack / Addon records (a LittleBigPlanet costume pack, "RE2 Extra DLC Pack") still appeared. The final allow-list run removed them, and the note says which run each table shows.
+  - **Ordering wording:** my first note said "the same search" came back in a different order. That overstated it, because the two queries were logically equivalent but not identical. I corrected the note to "unconfirmed" before reporting.
+  - **Leftovers kept on purpose:** the PRD's Problem Statement still says "editions and bundles", because it describes the original problem, not the rules. The plan's Phase 1 "What to build" list still says "Proposes…". I flagged both to the user.
+  - **Log anchor:** my first attempt to insert this entry failed because I matched on template wording that didn't exist. I inserted it above the previous newest entry instead.
+  - **Secrets:** all live queries ran from throwaway scripts in the session scratchpad. They reused the committed script's credential, token and error handling, and printed no credentials or tokens. The scripts aren't committed.
+
 ## 2026-11-14 — Phased implementation plan for the Django game tracker
 
 ### Prompts
