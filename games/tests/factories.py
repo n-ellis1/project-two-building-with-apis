@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from django.utils import timezone
 
-from games.models import Entry, Game, Platform
+from games.models import Entry, Game, Genre, Platform, Theme
 
 User = get_user_model()
 _ids = count(1_000_000)
@@ -17,14 +17,25 @@ def make_user(username: str, password: str = "test-pass-not-real") -> User:
     return User.objects.create_user(username, password=password)
 
 
-def make_game(name: str = "Test Game", platforms=(), **fields) -> Game:
+def make_game(name: str = "Test Game", platforms=(), genres=(), themes=(), **fields) -> Game:
+    """A Game linked to platforms, genres and themes given by name.
+
+    A theme may also be an `(igdb_id, name)` pair, for tests that need a real
+    IGDB theme ID such as `(19, "Horror")`.
+    """
     igdb_id = fields.pop("igdb_id", next(_ids))
     game = Game.objects.create(igdb_id=igdb_id, name=name, last_fetched_at=timezone.now(), **fields)
-    for platform_name in platforms:
-        platform, _ = Platform.objects.get_or_create(
-            name=platform_name, defaults={"igdb_id": next(_ids)}
-        )
-        game.platforms.add(platform)
+    for model, related, names in (
+        (Platform, game.platforms, platforms),
+        (Genre, game.genres, genres),
+        (Theme, game.themes, themes),
+    ):
+        for item in names:
+            item_id, item_name = item if isinstance(item, tuple) else (None, item)
+            obj, _ = model.objects.get_or_create(
+                name=item_name, defaults={"igdb_id": item_id or next(_ids)}
+            )
+            related.add(obj)
     return game
 
 

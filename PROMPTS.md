@@ -28,6 +28,71 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Phase 6: saved-games search, filters, Theme, sorts and HTMX pagination
+
+### Prompts
+1. `/implement` Read CLAUDE.md, prd/video-game-tracker.md, and the Phase 6 section of plans/video-game-tracker.md. Implement Phase 6 only: saved-game search, filters, sorting, and HTMX pagination.
+
+   Follow the approved plan and pause at the required TDD checkpoints. Preserve search, filters, sort, and page when returning from a game detail page. Verify that the URL, controls, and results agree when using Back and Forward, and that normal links and forms still work without JavaScript.
+
+   Run the five standard checks and give me a short browser checklist. Pause for my manual verification before marking Phase 6 complete, staging, committing, pushing, or starting Phase 7.
+2. I approve all three Phase 6 TDD candidates. Start with the search cycle. Test case-insensitive matches for each agreed field, a game that matches through multiple related rows but appears only once, and a search term found only in another user's notes that returns no results for the signed-in user. Run the focused tests, show me the RED result, and pause before implementing.
+
+   For the later sorting cycle, put tied entries across the 10-entry page boundary and verify that neither page repeats or skips an entry. For the HTMX cycle, verify that ordinary HTMX requests return the region containing both controls and results, while history-restore requests return the full page. We'll check actual Back and Forward behavior in the browser.
+
+   Keep the remaining Phase 6 work as proposed, including preserving search, filters, sort, and page when returning from a game detail page.
+3. I approve the search RED result. Implement the case-insensitive OR search across title, summary, platform, genre, theme, and the entry's own notes. Keep the queryset scoped to the signed-in user and apply distinct() before counting or paginating so each matching entry appears once.
+
+   Rerun the focused SearchTests and show me the GREEN result. Pause before starting the sorting cycle.
+4. I accept the search GREEN result. Start the sorting cycle. Test that rating sorts highest first with unrated entries last. Put tied ratings across the 10-entry page boundary and verify that case-insensitive title order, then entry ID, breaks the tie. Check the exact order on both pages so the test catches skipped or repeated entries.
+
+   Run the focused tests, show me the RED result, and pause before implementing the sort.
+5. I approve the sorting RED result and the seven URL values as proposed. Implement the rating sort for this cycle: highest first, unrated last, with ties broken by case-insensitive title A to Z and then entry ID. Keep added as the default.
+
+   Rerun the focused tests and show me the GREEN result, including the expected order across both pages. Pause before starting the HTMX cycle.
+6. I accept the sorting GREEN result. Start the HTMX cycle. For the same query URL, test that a normal request returns the full page, an HX-Request returns only the region containing both controls and results, and a request with both HX-Request and HX-History-Restore-Request returns the full page.
+
+   Use a query with a search term, at least one filter, a non-default sort, and enough matching entries to reach page 2. Verify that the rendered controls and results reflect that state. We'll verify actual browser Back and Forward behavior during manual testing.
+
+   Run the focused tests, show me the RED result, and pause before implementing the partial response.
+7. I approve the HTMX RED result. Implement the partial response for ordinary HTMX requests and keep the full page for normal requests and history restores. Render the controls and results from the same parsed query in all three cases.
+
+   Include HX-Push-Url on ordinary HTMX responses. Build it from the validated search, filters, sort, and the page actually displayed. Omit blank fields, the default sort, and page 1. Leave normal no-JavaScript submissions as they are. Add Vary for HX-Request and HX-History-Restore-Request so caches distinguish full pages from partial responses.
+
+   Extend the focused test to verify the clean pushed URL, including when an out-of-range page is clamped. Confirm normal requests and history restores still return full pages without a push header. Show me the GREEN result and pause before the remaining Phase 6 work.
+8. I accept the HTMX GREEN result. Finish Phase 6 as proposed: vendor the pinned HTMX release, document its source and integrity, load it locally, update CLAUDE.md, and run all five standard checks.
+
+   Set hx-history="false" on the full saved-games page so HTMX doesn't store private entries and notes in localStorage. Keep URL history working through the full-page history-restore response. Include a browser check that Back and Forward restore the correct URL, controls, and results.
+
+   Give me a short browser checklist covering search and filters, sort and pagination, Clear filters, returning from a detail page with the full query preserved, and the no-JavaScript fallback. Include one concrete example I can trace for Reflection Question 4. Leave the manual results pending until I report them.
+
+   Stop for my browser verification before marking Phase 6 complete, staging, committing, pushing, or starting Phase 7.
+9. I tried the Phase 6 browser checklist and didn't notice any issues. Record my manual verification in docs/verification.md. Mark individual steps as passed where confirmed, and leave any steps I didn't separately report as unverified in the browser. Link a Reflection Question 4 screenshot if one exists, or leave it pending. Keep the Phase 4 B1 screenshots pending too if they're still missing.
+
+   Update CLAUDE.md and PROMPTS.md, mark Phase 6 complete in the plan, and rerun the five standard checks. Show me the results, git status --short, and the planned commit message. Pause before staging, committing, pushing, or starting Phase 7.
+
+### Summary
+- **Outcome:**
+  - **TDD selection:** I proposed three behaviors (search across fields with one row per entry, sorts with missing values last and stable tie-breakers, HTMX partial vs full page). The user approved all three and specified the cases. Each cycle paused after RED and after GREEN.
+  - **Cycle 1, search:** `EntryQuery` and `saved_entries(user, query)` in `games/queries.py`. RED: 8 assertion failures (the builder ignored `q` and returned the whole list). GREEN: one `Q` ORing `icontains` across title, summary, platform, genre and theme names and the entry's own `notes`, then `distinct()` before counting or paging. Notes never join through the shared game's other entries, so another user's notes can't match.
+  - **Cycle 2, rating sort:** RED: page 1 came back newest first. GREEN: `F("rating").desc(nulls_last=True)` then `Lower(title)` then ID. The test checks the exact order on both pages for ten rating-7 ties across the boundary (including `alpha`/`Alpha` decided by ID), with no repeats or gaps. The user approved the seven sort URL values: `added` (default), `title`, `title_desc`, `rating`, `release`, `hours`, `updated`.
+  - **Groundwork before Cycle 3 (normal implementation):** the other filters and sorts, the forgiving `parse_entry_query`, `user_themes`/`user_platforms_played` dropdown sources, `EntryQuery.querystring()`/`without_filters()`, `saved_games_url(query, page)`, the controls and results moved into `_saved_games_region.html`, and the detail return link rebuilt from the full parsed state (the B1 extension). Tests for each, plus three existing pager assertions changed from `?page=2` to `/games/?page=2`.
+  - **Cycle 3, HTMX:** RED: only the `HX-Request` subtest failed (full page instead of the region). GREEN: `is_htmx_swap()` returns the region for `HX-Request` without `HX-History-Restore-Request`, with `HX-Push-Url` set to the clean URL of the page actually shown; normal requests and history restores get the full page; every response adds `Vary: HX-Request, HX-History-Restore-Request`. The user asked for the push header and `Vary` and for the test to cover a clamped page.
+  - **Finish:** vendored `htmx.org@2.0.11` (the registry's `latest` 2.x, published 2026-09-22) after checking the tarball against the registry's SHA-512; `SOURCE.md` records origin, integrity and the file's SHA-256. Loaded locally and deferred in `base.html`. `hx-history="false"` sits outside the swapped region, so HTMX never writes entries or notes to localStorage and every Back/Forward restores from the server; I confirmed this behavior in the 2.0.11 source before relying on it. CLAUDE.md gained the query-state and HTMX conventions. `docs/verification.md` gained the Phase 6 table and the Reflection Question 4 section with file and line references and a traced walk (15 → 5 → 10 → 9 → 2 → 1 entries for `demo_a`).
+  - **Manual checks:** the user reported trying the whole checklist with no issues noticed. Individual steps weren't confirmed, so every row is recorded as unverified in the browser with its automated test. No screenshots exist yet: the Reflection Question 4 Back-step screenshot and both B1 screenshots stay pending. Phase 6 is marked complete in the plan with that caveat. All five standard checks pass with 153 tests (113 before the phase). Nothing staged, committed or pushed; Phase 7 not started.
+- **Deviations:**
+  - **HTMX RED ordering:** the user asked to start the HTMX cycle straight after sorting. I built the controls, filters and links first as normal implementation so the RED would isolate the partial response; the GREEN step then only chose the template and set headers.
+  - **My proposals the user accepted:** the `HX-Push-Url` cleanup (raised as a question at the HTMX RED), the sort URL values, and the region-partial structure.
+  - **User additions:** `Vary` on every response, a clamped-page push test, `hx-history="false"` for privacy, and recording unconfirmed browser steps as unverified.
+  - **Unrequested additions:** search text is trimmed and capped at 200 characters; an unknown or another user's Platform Played value is ignored like a theme; the search box triggers only on submit (swapping it while typing would lose the caret); a "Show all my games" link on the no-match state.
+- **Sideways:**
+  - **Stray placeholder:** while adding the sort test, I accidentally inserted an empty `..._PLACEHOLDER` test method into `SearchTests`. Removed in the next edit, before any run, and reported at the sorting RED.
+  - **Sloppy assertion:** the first HTMX test had a Favorite regex that matched either way. Removed before reporting RED; the exact `selected` count already covered it.
+  - **Assertions not seen RED:** the push-URL and `Vary` assertions were added together with their code at the user's request, so they were never observed failing on their own.
+  - **Fixture wording:** the first draft of the S3 manual step expected `fog` to match only Silent Hill 2; I replaced it with traced expectations because I couldn't rule out matches in seeded summaries.
+  - **Ruff:** `ruff format` reformatted four files on the first full run; `ruff check` was clean.
+  - No credentials or password values were printed, logged or written to files. The seed inspection printed only titles, statuses, theme flags and notes from the committed fixture.
+
 ## 2026-11-15 — Phase 5: shared validation, entry editing and delete confirmation
 
 ### Prompts

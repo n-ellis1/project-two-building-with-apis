@@ -177,7 +177,7 @@ class SeededDataTests(TestCase):
         page1 = self.client.get(url)
         page2 = self.client.get(url, {"page": "2"})
         self.assertEqual(len(page1.context["page_obj"]), 10)
-        self.assertContains(page1, 'href="?page=2"')
+        self.assertContains(page1, f'href="{url}?page=2"')
         self.assertEqual(page2.context["page_obj"].number, 2)
         self.assertEqual(len(page2.context["page_obj"]), self.demo_a.entries.count() - 10)
 

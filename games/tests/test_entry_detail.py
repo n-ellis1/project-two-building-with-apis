@@ -108,6 +108,69 @@ class ReturnToSavedGamesPageTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class ReturnToSavedGamesStateTests(TestCase):
+    """Phase 6 extension of B1: the return link keeps search, filters, sort and page."""
+
+    def setUp(self):
+        self.user = make_user("demo_a")
+        self.client.force_login(self.user)
+        start = timezone.now() - timedelta(days=30)
+        self.entries = [
+            make_entry(
+                self.user,
+                make_game(f"Horror {n:02d}", themes=[(19, "Horror")]),
+                status="playing",
+                favorite=True,
+                platform_played="PlayStation",
+                created_at=start + timedelta(hours=n),
+            )
+            for n in range(1, 13)
+        ]
+        self.list_url = reverse("games:saved_games")
+        self.state = {
+            "q": "horror",
+            "status": "playing",
+            "platform": "PlayStation",
+            "favorite": "1",
+            "theme": "19",
+            "sort": "title_desc",
+        }
+        self.state_qs = (
+            "q=horror&amp;status=playing&amp;platform=PlayStation&amp;favorite=1"
+            "&amp;theme=19&amp;sort=title_desc"
+        )
+
+    def return_href(self, response):
+        match = re.search(
+            r'href="([^"]*)"[^>]*data-testid="saved-games-return"', response.content.decode()
+        )
+        self.assertIsNotNone(match)
+        return match.group(1)
+
+    def test_opened_from_a_searched_filtered_sorted_page_2_returns_to_that_exact_state(self):
+        list_page = self.client.get(self.list_url, {**self.state, "page": "2"})
+        entry = list_page.context["page_obj"][0]
+        detail_link = f"{detail_url(entry.pk)}?{self.state_qs}&amp;page=2"
+        self.assertContains(list_page, f'href="{detail_link}"')
+
+        response = self.client.get(detail_url(entry.pk), {**self.state, "page": "2"})
+
+        self.assertEqual(self.return_href(response), f"{self.list_url}?{self.state_qs}&amp;page=2")
+        # Following the return link shows the same list state the entry was opened from.
+        back = self.client.get(self.list_url, {**self.state, "page": "2"})
+        self.assertIn(entry, list(back.context["page_obj"]))
+
+    def test_invalid_sort_and_another_users_theme_are_not_carried_over(self):
+        other = make_user("demo_b")
+        make_entry(other, make_game("Portal 2", themes=[(27, "Comedy")]))
+        response = self.client.get(
+            detail_url(self.entries[0].pk),
+            {"q": "horror", "sort": "bogus", "theme": "27", "status": "x", "page": "2"},
+        )
+        self.assertEqual(self.return_href(response), f"{self.list_url}?q=horror&amp;page=2")
+        self.assertNotContains(response, "bogus")
+
+
 class EntryDetailContentTests(TestCase):
     def setUp(self):
         self.user = make_user("player")

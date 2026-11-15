@@ -359,15 +359,17 @@ Back and Forward have to keep the URL, the visible controls and the results in a
 
 ### Acceptance criteria
 
-- [ ] Each search field finds its entry. An entry matching on several joined values (for example a platform and a genre) appears once.
-- [ ] Each filter works alone and combined. The Theme dropdown shows only the user's own themes, alphabetically. Horror and Survival filter correctly for demo user A, and neither appears for demo user B.
-- [ ] All seven sorts order correctly, with missing values last. Reversing the title sort with the same search and filters changes the order but not the count. No entry is repeated or skipped across a page boundary on a tie.
-- [ ] `?sort=bogus` uses the default. `?theme=abc` and a theme only on another user's games are ignored.
-- [ ] Changing anything returns to page 1. Pager links keep state. Clear filters behaves as specified.
-- [ ] With JavaScript disabled, the same URLs give the same results as full pages.
-- [ ] After changing the search, a filter, the sort and the page, each Back and Forward step shows a URL, visible controls (search box, Status, Platform Played, Favorite, Theme, sort, current page) and results that all agree, with or without HTMX's history cache.
-- [ ] Notes text that appears only in user A's entries finds nothing for user B.
-- [ ] `docs/verification.md` has the Reflection Question 4 browser example, with file and line references to the code that parses the query, renders the controls, pushes the URL and handles history restores.
+- [x] Each search field finds its entry. An entry matching on several joined values (for example a platform and a genre) appears once.
+- [x] Each filter works alone and combined. The Theme dropdown shows only the user's own themes, alphabetically. Horror and Survival filter correctly for demo user A, and neither appears for demo user B.
+- [x] All seven sorts order correctly, with missing values last. Reversing the title sort with the same search and filters changes the order but not the count. No entry is repeated or skipped across a page boundary on a tie.
+- [x] `?sort=bogus` uses the default. `?theme=abc` and a theme only on another user's games are ignored.
+- [x] Changing anything returns to page 1. Pager links keep state. Clear filters behaves as specified.
+- [x] With JavaScript disabled, the same URLs give the same results as full pages.
+- [x] After changing the search, a filter, the sort and the page, each Back and Forward step shows a URL, visible controls (search box, Status, Platform Played, Favorite, Theme, sort, current page) and results that all agree, with or without HTMX's history cache.
+- [x] Notes text that appears only in user A's entries finds nothing for user B.
+- [x] `docs/verification.md` has the Reflection Question 4 browser example, with file and line references to the code that parses the query, renders the controls, pushes the URL and handles history restores.
+
+**Result (2026-11-15):** all standard checks pass (153 tests). The user ran the browser checklist and reported no issues; individual steps weren't confirmed one by one, so `docs/verification.md` records them as unverified in the browser alongside their automated tests. The Reflection Question 4 screenshot is still pending. Query state flows through `parse_entry_query` → `EntryQuery` → `saved_entries` in `games/queries.py`; sort URL values are `added` (default), `title`, `title_desc`, `rating`, `release`, `hours`, `updated`. HTMX 2.0.11 is vendored with its integrity checked. Ordinary HTMX requests get the `_saved_games_region.html` partial with a clean `HX-Push-Url`; normal requests and history restores get the full page, which sets `hx-history="false"` so entries and notes are never stored in localStorage.
 
 ### Automated checks
 
@@ -714,7 +716,7 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Phase 3: Models, admin, demo seed and basic My Saved Games
 - [x] Phase 4: Entry detail page and covers (functional verification complete; B1 screenshots pending)
 - [x] Phase 5: Edit and delete entries
-- [ ] Phase 6: Search, filters, Theme, sorts and pagination
+- [x] Phase 6: Search, filters, Theme, sorts and pagination (no browser issues reported; RQ4 screenshot pending)
 - [ ] Phase 7: IGDB client and IGDB search page
 - [ ] Phase 8: Save a game from search
 - [ ] Phase 9: Refresh from IGDB

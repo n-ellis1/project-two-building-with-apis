@@ -1,19 +1,57 @@
-"""Owner-scoped entry lookups and saved-games paging, shared by the website and API.
+"""Owner-scoped entry lookups and the saved-entries query builder, shared by the
+website and API.
 
 Every entry lookup starts from `owned_entries(user)`, so another user's entry ID behaves
 exactly like an ID that doesn't exist (404).
+
+Query state flows one way: request values -> `parse_entry_query()` (forgiving, for the
+website; the API adds a strict parser in Phase 10) -> `EntryQuery` -> `saved_entries()`.
+Controls, pager links, Clear filters and detail return links are all rendered from the
+same `EntryQuery`, so they can never disagree with the results.
 """
 
+from dataclasses import dataclass
+from urllib.parse import urlencode
+
+from django.db.models import F, Q
 from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 
-from .models import Entry
+from .models import Entry, Theme
 
 PAGE_SIZE = 10
 
-# Date Added (Newest First), the default sort. Ties break by title A to Z
-# (case-insensitive), then entry ID, so paging never repeats or skips an entry.
-DEFAULT_ORDERING = ("-created_at", Lower("game__name"), "id")
+# Longest search term kept from the URL; anything longer is cut, not rejected.
+MAX_SEARCH_LENGTH = 200
+
+# The seven whitelisted sorts: URL value -> label, in dropdown order.
+SORT_LABELS = {
+    "added": "Date Added (Newest First)",
+    "title": "Title A to Z",
+    "title_desc": "Title Z to A",
+    "rating": "Rating (Highest First)",
+    "release": "Release Date (Newest First)",
+    "hours": "Hours Played (Most First)",
+    "updated": "Last Updated (Newest First)",
+}
+DEFAULT_SORT = "added"
+
+# Non-title sorts break ties by title A to Z (case-insensitive), then entry ID, so
+# paging never repeats or skips an entry. Title sorts break ties by entry ID only.
+# Missing values sort last. No sort orders by a many-to-many field, which keeps
+# `distinct()` returning one row per entry.
+TITLE_THEN_ID = (Lower("game__name"), "id")
+ORDERINGS = {
+    "added": (F("created_at").desc(), *TITLE_THEN_ID),
+    "title": (Lower("game__name"), "id"),
+    "title_desc": (Lower("game__name").desc(), "id"),
+    "rating": (F("rating").desc(nulls_last=True), *TITLE_THEN_ID),
+    "release": (F("game__first_release_date").desc(nulls_last=True), *TITLE_THEN_ID),
+    "hours": (F("hours_played").desc(nulls_last=True), *TITLE_THEN_ID),
+    "updated": (F("updated_at").desc(), *TITLE_THEN_ID),
+}
+DEFAULT_ORDERING = ORDERINGS[DEFAULT_SORT]
 
 
 def parse_page(value) -> int:
@@ -39,11 +77,141 @@ def get_owned_entry_or_404(user, entry_id):
     return get_object_or_404(owned_entries(user), pk=entry_id)
 
 
-def saved_entries(user):
-    """The user's entries for My Saved Games, newest first, with game data loaded."""
-    return (
+def user_themes(user):
+    """Themes on the user's own saved games, alphabetical, regardless of any filter.
+
+    Another user's saved games never add a theme here.
+    """
+    return Theme.objects.filter(games__entries__owner=user).distinct().order_by(Lower("name"), "id")
+
+
+def user_platforms_played(user) -> list[str]:
+    """The distinct, non-blank Platform Played values on the user's entries, A to Z."""
+    values = (
         owned_entries(user)
-        .select_related("game")
-        .prefetch_related("game__platforms")
-        .order_by(*DEFAULT_ORDERING)
+        .exclude(platform_played="")
+        .values_list("platform_played", flat=True)
+        .distinct()
     )
+    return sorted(values, key=str.casefold)
+
+
+@dataclass(frozen=True)
+class EntryQuery:
+    """Already-validated saved-entries query state (search, filters, sort).
+
+    The website parses request values into this forgivingly; the API (Phase 10)
+    parses strictly. Both then call `saved_entries(user, query)`.
+    """
+
+    q: str = ""
+    status: str = ""
+    platform: str = ""
+    favorite: bool = False
+    theme: int | None = None  # IGDB theme ID
+    sort: str = DEFAULT_SORT
+
+    @property
+    def has_filters(self) -> bool:
+        return bool(self.status or self.platform or self.favorite or self.theme is not None)
+
+    def without_filters(self) -> EntryQuery:
+        """Clear filters: keeps the search and sort, drops Status, Platform, Favorite, Theme."""
+        return EntryQuery(q=self.q, sort=self.sort)
+
+    def params(self, page: int = 1) -> list[tuple[str, str]]:
+        """URL parameters for this state, leaving out defaults (and page 1)."""
+        pairs = [
+            ("q", self.q),
+            ("status", self.status),
+            ("platform", self.platform),
+            ("favorite", "1" if self.favorite else ""),
+            ("theme", "" if self.theme is None else str(self.theme)),
+            ("sort", "" if self.sort == DEFAULT_SORT else self.sort),
+            ("page", str(page) if page > 1 else ""),
+        ]
+        return [(key, value) for key, value in pairs if value]
+
+    def querystring(self, page: int = 1) -> str:
+        """`?q=...&page=2`, or an empty string when everything is a default."""
+        params = self.params(page)
+        return f"?{urlencode(params)}" if params else ""
+
+
+def parse_entry_query(user, params) -> EntryQuery:
+    """Website (forgiving) parsing of `q`, `status`, `platform`, `favorite`, `theme`, `sort`.
+
+    Never raises: an unknown status, platform or sort, a malformed theme, or a theme
+    or platform that isn't on the user's own saved games is dropped, so a bad or
+    stale link still shows the list. Only values that pass are ever echoed back.
+    """
+    q = " ".join(str(params.get("q", "")).split())[:MAX_SEARCH_LENGTH]
+
+    status = params.get("status", "")
+    if status not in Entry.Status.values:
+        status = ""
+
+    platform = params.get("platform", "")
+    if platform and platform not in user_platforms_played(user):
+        platform = ""
+
+    favorite = params.get("favorite", "") == "1"
+
+    theme = None
+    raw_theme = str(params.get("theme", "")).strip()
+    if raw_theme.isascii() and raw_theme.isdigit():
+        candidate = int(raw_theme)
+        if user_themes(user).filter(igdb_id=candidate).exists():
+            theme = candidate
+
+    sort = params.get("sort", "")
+    if sort not in SORT_LABELS:
+        sort = DEFAULT_SORT
+
+    return EntryQuery(
+        q=q, status=status, platform=platform, favorite=favorite, theme=theme, sort=sort
+    )
+
+
+def search_condition(term: str) -> Q:
+    """Case-insensitive match on the game's title, summary, platform, genre and
+    theme names, or the entry's own notes (never another user's notes)."""
+    return (
+        Q(game__name__icontains=term)
+        | Q(game__summary__icontains=term)
+        | Q(game__platforms__name__icontains=term)
+        | Q(game__genres__name__icontains=term)
+        | Q(game__themes__name__icontains=term)
+        | Q(notes__icontains=term)
+    )
+
+
+def saved_entries(user, query: EntryQuery = EntryQuery()):
+    """The user's entries for My Saved Games, matching `query`, with game data loaded.
+
+    The search and Theme joins can return one entry several times, so `distinct()`
+    is applied here, before the caller counts or paginates.
+    """
+    entries = owned_entries(user)
+    if query.q:
+        entries = entries.filter(search_condition(query.q))
+    if query.status:
+        entries = entries.filter(status=query.status)
+    if query.platform:
+        entries = entries.filter(platform_played=query.platform)
+    if query.favorite:
+        entries = entries.filter(favorite=True)
+    if query.theme is not None:
+        entries = entries.filter(game__themes__igdb_id=query.theme)
+    if query.q or query.theme is not None:
+        entries = entries.distinct()
+    return (
+        entries.select_related("game")
+        .prefetch_related("game__platforms")
+        .order_by(*ORDERINGS.get(query.sort, DEFAULT_ORDERING))
+    )
+
+
+def saved_games_url(query: EntryQuery = EntryQuery(), page: int = 1) -> str:
+    """My Saved Games for `query` at `page`, always on our own route."""
+    return reverse("games:saved_games") + query.querystring(page)

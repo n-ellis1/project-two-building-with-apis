@@ -1,0 +1,134 @@
+{% load game_covers %}
+{% comment %}
+  The swapped region of My Saved Games: the controls AND the results, rendered from
+  one parsed query, so a swap or a history restore can never show old control values
+  next to new results. HTMX requests get only this; everything else gets the full page.
+  Without JavaScript, the form and links are ordinary GET navigation to the same URLs.
+{% endcomment %}
+<div id="saved-games-region" data-testid="saved-games-region"
+     hx-target="#saved-games-region" hx-swap="outerHTML" hx-push-url="true">
+{% if has_entries %}
+  {% url 'games:saved_games' as list_url %}
+  <form method="get" action="{{ list_url }}" role="search" class="card card-body shadow-sm mb-3"
+        data-testid="saved-games-controls"
+        hx-get="{{ list_url }}" hx-trigger="submit, change[target.tagName=='SELECT']">
+    {# No page field: any change to the search, a filter or the sort returns to page 1. #}
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-lg-4">
+        <label for="saved-q" class="form-label small mb-1">Search my games</label>
+        <input type="search" id="saved-q" name="q" value="{{ query.q }}" class="form-control"
+               placeholder="Title, platform, genre, theme, notes…" maxlength="200">
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <label for="saved-status" class="form-label small mb-1">Status</label>
+        <select id="saved-status" name="status" class="form-select">
+          <option value="">All statuses</option>
+          {% for value, label in status_choices %}
+            <option value="{{ value }}"{% if value == query.status %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <label for="saved-platform" class="form-label small mb-1">Platform Played</label>
+        <select id="saved-platform" name="platform" class="form-select">
+          <option value="">All platforms</option>
+          {% for value in platform_choices %}
+            <option value="{{ value }}"{% if value == query.platform %} selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <label for="saved-favorite" class="form-label small mb-1">Favorite</label>
+        <select id="saved-favorite" name="favorite" class="form-select">
+          <option value="">All games</option>
+          <option value="1"{% if query.favorite %} selected{% endif %}>Favorites only</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <label for="saved-theme" class="form-label small mb-1">Theme</label>
+        <select id="saved-theme" name="theme" class="form-select">
+          <option value="">All Themes</option>
+          {% for theme in theme_choices %}
+            <option value="{{ theme.igdb_id }}"{% if theme.igdb_id == query.theme %} selected{% endif %}>{{ theme.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4 col-lg-3">
+        <label for="saved-sort" class="form-label small mb-1">Sort by</label>
+        <select id="saved-sort" name="sort" class="form-select">
+          {% for value, label in sort_choices %}
+            <option value="{{ value }}"{% if value == query.sort %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-auto d-flex gap-2 align-items-center">
+        <button type="submit" class="btn btn-primary">Apply</button>
+        {% if query.has_filters %}
+          <a href="{{ clear_filters_url }}" hx-get="{{ clear_filters_url }}" class="btn btn-link" data-testid="clear-filters">Clear filters</a>
+        {% endif %}
+      </div>
+    </div>
+  </form>
+
+  {% if page_obj.paginator.count %}
+    <p class="text-body-secondary small mb-2" data-testid="result-summary">
+      Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+      · sorted by {{ sort_label }}
+    </p>
+    <ul class="list-group shadow-sm mb-3" data-testid="entry-list">
+      {# Detail links are normal navigation and carry the list state (B1, extended in Phase 6). #}
+      {% for entry in page_obj %}
+        {% url 'games:entry_detail' entry.pk as detail_url %}
+        <li class="list-group-item py-3 d-flex gap-3 align-items-start" data-testid="entry-row">
+          <a href="{{ detail_url }}{{ detail_querystring }}" class="flex-shrink-0" tabindex="-1" aria-hidden="true">{% cover_img entry.game "small" %}</a>
+          <div class="flex-grow-1">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+              <a class="fw-semibold" href="{{ detail_url }}{{ detail_querystring }}">{{ entry.game.name }}</a>
+              {% if entry.game.category_badge %}
+                <span class="badge text-bg-info" data-testid="category-badge">{{ entry.game.category_badge }}</span>
+              {% endif %}
+              {% if entry.favorite %}
+                <span class="badge text-bg-warning" data-testid="favorite-badge">★ Favorite</span>
+              {% endif %}
+            </div>
+            <div class="small text-body-secondary">
+              <span class="badge text-bg-secondary me-1">{{ entry.get_status_display }}</span>
+              {% for platform in entry.game.platforms.all %}{{ platform.name }}{% if not forloop.last %}, {% endif %}{% empty %}Platforms unknown{% endfor %}
+            </div>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+    {% if page_obj.has_other_pages %}
+      <nav aria-label="Saved games pages" class="d-flex align-items-center gap-3">
+        {% if previous_url %}
+          <a class="btn btn-outline-primary btn-sm" href="{{ previous_url }}" hx-get="{{ previous_url }}" rel="prev">Previous</a>
+        {% endif %}
+        <span class="small text-body-secondary" data-testid="page-label">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if next_url %}
+          <a class="btn btn-outline-primary btn-sm" href="{{ next_url }}" hx-get="{{ next_url }}" rel="next">Next</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  {% else %}
+    <div class="card shadow-sm" data-testid="no-matches">
+      <div class="card-body text-center py-5">
+        <p class="lead mb-2">No saved games match your search and filters.</p>
+        <p class="text-body-secondary mb-3">Try a different search or loosen the filters.</p>
+        {% if query.has_filters %}
+          <a class="btn btn-outline-primary" href="{{ clear_filters_url }}" hx-get="{{ clear_filters_url }}">Clear filters</a>
+        {% endif %}
+        <a class="btn btn-link" href="{{ list_url }}" hx-get="{{ list_url }}">Show all my games</a>
+      </div>
+    </div>
+  {% endif %}
+{% else %}
+  <div class="card shadow-sm">
+    <div class="card-body text-center py-5">
+      <p class="lead mb-2">You haven't saved any games yet.</p>
+      <p class="text-body-secondary mb-3">Search IGDB to find a game and add it to your list.</p>
+      <a class="btn btn-primary" href="{% url 'games:search' %}">Search IGDB</a>
+    </div>
+  </div>
+{% endif %}
+</div>

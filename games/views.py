@@ -3,11 +3,24 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
-from django.urls import reverse
+from django.utils.cache import patch_vary_headers
 from django.views.decorators.http import require_http_methods
 
 from .forms import EntryForm, SignupForm
-from .queries import PAGE_SIZE, get_owned_entry_or_404, parse_page, saved_entries
+from .models import Entry
+from .queries import (
+    PAGE_SIZE,
+    SORT_LABELS,
+    EntryQuery,
+    get_owned_entry_or_404,
+    owned_entries,
+    parse_entry_query,
+    parse_page,
+    saved_entries,
+    saved_games_url,
+    user_platforms_played,
+    user_themes,
+)
 
 
 def home(request):
@@ -28,36 +41,84 @@ def signup(request):
     return render(request, "registration/signup.html", {"form": form})
 
 
+def saved_games_context(user, query: EntryQuery, page_number: int) -> dict:
+    """Everything the My Saved Games region renders, built from one parsed query.
+
+    The controls (search box, Status, Platform Played, Favorite, Theme, sort), the
+    results, the pager, Clear filters and the detail links all come from `query`
+    and the resolved page, so they always agree with each other and with the URL.
+    """
+    paginator = Paginator(saved_entries(user, query), PAGE_SIZE)
+    page_obj = paginator.get_page(page_number)
+    number = page_obj.number
+    return {
+        "page_obj": page_obj,
+        "query": query,
+        "has_entries": owned_entries(user).exists(),
+        "status_choices": Entry.Status.choices,
+        "platform_choices": user_platforms_played(user),
+        "theme_choices": user_themes(user),
+        "sort_choices": SORT_LABELS.items(),
+        "sort_label": SORT_LABELS[query.sort],
+        "clear_filters_url": saved_games_url(query.without_filters()),
+        "previous_url": saved_games_url(query, number - 1) if page_obj.has_previous() else "",
+        "next_url": saved_games_url(query, number + 1) if page_obj.has_next() else "",
+        # Detail links carry the list state, so the detail page can return to it.
+        "detail_querystring": query.querystring(number),
+    }
+
+
+def is_htmx_swap(request) -> bool:
+    """An ordinary HTMX request, which swaps in just the region.
+
+    A history restore that missed HTMX's cache also sends `HX-Request`, but it
+    replaces the whole page, so it must get the full page.
+    """
+    return (
+        request.headers.get("HX-Request") == "true"
+        and request.headers.get("HX-History-Restore-Request") != "true"
+    )
+
+
 @login_required
 def saved_games(request):
-    """My Saved Games, read only from SQLite (never contacts IGDB)."""
-    paginator = Paginator(saved_entries(request.user), PAGE_SIZE)
-    page_obj = paginator.get_page(parse_page(request.GET.get("page")))
-    return render(request, "games/saved_games.html", {"page_obj": page_obj})
+    """My Saved Games, read only from SQLite (never contacts IGDB).
 
-
-def saved_games_url(page: int) -> str:
-    """My Saved Games at `page`, built from our own route (no `?page` for page 1)."""
-    url = reverse("games:saved_games")
-    return f"{url}?page={page}" if page > 1 else url
+    One parsed query renders the controls and the results for all three kinds of
+    request: a normal request and an HTMX history restore get the full page, and an
+    ordinary HTMX request gets only the region, plus `HX-Push-Url` with the clean
+    URL of what is actually shown (validated values only, no blanks, no default
+    sort, the clamped page, no page 1).
+    """
+    query = parse_entry_query(request.user, request.GET)
+    context = saved_games_context(request.user, query, parse_page(request.GET.get("page")))
+    if is_htmx_swap(request):
+        response = render(request, "games/_saved_games_region.html", context)
+        response["HX-Push-Url"] = saved_games_url(query, context["page_obj"].number)
+    else:
+        response = render(request, "games/saved_games.html", context)
+    # The same URL returns two different bodies, so caches must key on both headers.
+    patch_vary_headers(response, ["HX-Request", "HX-History-Restore-Request"])
+    return response
 
 
 @login_required
 def entry_detail(request, entry_id):
     """One of my entries, read only from SQLite. Anyone else's entry ID is a 404.
 
-    `?page` is the My Saved Games page the entry was opened from. It only ever
-    becomes a validated page number on our own route (Phase 6 adds the rest of
-    the list's query state).
+    The query string is the My Saved Games state the entry was opened from. It is
+    parsed exactly like the list's (unknown values dropped, never echoed) and only
+    ever becomes a link on our own route.
     """
     entry = get_owned_entry_or_404(request.user, entry_id)
+    query = parse_entry_query(request.user, request.GET)
     return render(
         request,
         "games/entry_detail.html",
         {
             "entry": entry,
             "game": entry.game,
-            "saved_games_return_url": saved_games_url(parse_page(request.GET.get("page"))),
+            "saved_games_return_url": saved_games_url(query, parse_page(request.GET.get("page"))),
         },
     )
 
