@@ -532,7 +532,7 @@ Standard checks, plus save-service tests (new, reuse, stored-excluded, excluded 
 
 ## Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page
 
-**Recorded 2026-11-15. Not started:** implement only after the Phase 8 commit, and before Phase 9.
+**Recorded 2026-11-15. Complete (2026-11-15):** implemented after the Phase 8 commit and before Phase 9, and verified in the browser by the user.
 
 **User request**: on the blank Search IGDB page, show the games most visited on IGDB, and let me open any IGDB game (saved or not) inside the tracker and save it from there.
 
@@ -551,17 +551,43 @@ Standard checks, plus save-service tests (new, reuse, stored-excluded, excluded 
   - **Data source:** a stored Game is read from SQLite (works during an outage). An unstored game is fetched with `igdb.fetch_game` (one request; an unknown ID → 404 page with the fixed message; an outage → the fixed message with the My Saved Games link and the Search IGDB link).
   - **Actions:** if I already saved it, a link to **my** entry (owner-scoped lookup, the same as Saved links). Otherwise, if it is eligible, a Save button posting to the existing `/search/save/` flow. An ineligible game shows no Save button, only the excluded message. Always a link back to Search IGDB.
   - **Save from detail:** `/search/save/` gains an optional, validated return target, so a failed save from this page comes back to the detail page with the message (the target is rebuilt from the posted IGDB ID on our own route, never echoed from the request). New saves and duplicates behave as in Phase 8.
-- **Search results** may link their titles to the same detail page (optional; decide during implementation).
+- **Search results** may link their titles to the same detail page (optional; decide during implementation). **Decided:** yes, and the Save and Saved controls stay on each result (user decision).
 
 ### Acceptance criteria
 
-- [ ] With no search term, the row shows up to 10 eligible games in PopScore visits order, each with its cover (or the placeholder) and title as one link to the detail page. With a search term, the row isn't rendered and no popularity request is made.
-- [ ] Ineligible games in the PopScore list are skipped, and the row still fills from the following ranks.
-- [ ] A second blank-page load within the cache time makes no IGDB request. After expiry, the row is fetched again.
-- [ ] When the feed fails (timeout, unreachable, rate limit, misconfigured, unavailable), the page returns 200 with a working search box and no row; the failure isn't cached.
-- [ ] The detail page shows cover, summary, release date and platforms for both a stored and an unstored game. Mine shows a link to my entry; another user's saved game shows Save for me; an ineligible game shows no Save.
-- [ ] Saving from the detail page uses the save service: a new save lands on edit, a duplicate on my entry with "Already in your games", a failure returns to the detail page with the message.
-- [ ] Signed-out visitors are redirected to login for both the search page and the detail page, and IGDB is never called.
+All seven are covered by automated tests. The user's browser walkthrough passed on 2026-11-15. The per-behavior record is in the Result below and in `docs/verification.md`.
+
+- [x] With no search term, the row shows up to 10 eligible games in PopScore visits order, each with its cover (or the placeholder) and title as one link to the detail page. With a search term, the row isn't rendered and no popularity request is made.
+- [x] Ineligible games in the PopScore list are skipped, and the row still fills from the following ranks.
+- [x] A second blank-page load within the cache time makes no IGDB request. After expiry, the row is fetched again.
+- [x] When the feed fails (timeout, unreachable, rate limit, misconfigured, unavailable), the page returns 200 with a working search box and no row; the failure isn't cached.
+- [x] The detail page shows cover, summary, release date and platforms for both a stored and an unstored game. Mine shows a link to my entry; another user's saved game shows Save for me; an ineligible game shows no Save.
+- [x] Saving from the detail page uses the save service: a new save lands on edit, a duplicate on my entry with "Already in your games", a failure returns to the detail page with the message.
+- [x] Signed-out visitors are redirected to login for both the search page and the detail page, and IGDB is never called.
+
+**Result (2026-11-15):** all standard checks pass (263 tests). The user's browser walkthrough passed. The record matches `docs/verification.md`, where the step numbers differ from the manual steps below, so behaviors are named here:
+- **Confirmed by the user:**
+  - the popular cover row scrolled sideways
+  - cards opened the IGDB game page
+  - Save from that page landed on the edit page
+  - the reopened card showed Saved, and the game page offered "Open my entry"
+  - a title search hid the row, and clearing the search brought it back
+  - search result titles opened the same game page
+- **Not reported** (covered by automated tests):
+  - phone width
+  - the placeholder for a missing or failed cover
+  - each detail-page field one by one
+  - the Save and Saved controls staying on search results
+- **Not run** (optional, covered by automated tests):
+  - the other demo user seeing Save instead of the first user's entry
+  - the Wi-Fi-off check (blank search page without the row, stored game page from SQLite) PopScore was verified against the docs and one live run ([docs/research/igdb-popscore.md](../docs/research/igdb-popscore.md)). Three approved TDD cycles were run:
+- **Ranking and eligibility:** `igdb.popular_games()`.
+- **Cache and feed failure:** `igdb.cached_popular_games()`, one hour, `igdb:popular_games`, and `views.popular_row()`, which resolves Saved links per user.
+- **Save return:** `search_save` accepts `return_to=igdb_game` and rebuilds the detail URL from the validated ID.
+
+The rest was built normally: the detail page `views.igdb_game` with `igdb_game.html`, the row template `_popular_row.html`, result title links, the one-hour expiry test with a fake cache clock, and `igdb.category_badge()` shared by both IGDB record types.
+- **Offline test guard:** after Cycle 2, a regression run likely made real Twitch and IGDB calls, because `manage.py test` loads `.env` and a blank-search test reached the new feed. `config/test_runner.py` (`OfflineTestRunner`) now blanks the credentials and blocks `requests.post` for every test (recorded in PROMPTS.md and CLAUDE.md).
+- **Duplicate error alert (found and fixed during implementation):** after a failed save from the detail page, an unstored game's page showed the same message twice, once as the flash message and once as its own alert. The page now leaves out its own alert when the same message is already queued. A regression test was written first and seen failing (`2 != 1`), recorded in `docs/verification.md`.
 
 ### Automated checks
 
@@ -569,9 +595,9 @@ Standard checks, plus client tests with mocked HTTP (PopScore query body, rank o
 
 ### Before implementing (to confirm)
 
-- Verify the PopScore endpoint, the visits `popularity_type` ID and the response shape against the official IGDB docs and one live request from a throwaway scratchpad script (IDs and counts only, no credentials printed), and record it in `docs/research/`.
-- Confirm the cache time, and whether results' titles should link to the detail page.
-- Add a short PRD addendum (a new user story for the popular row and the IGDB detail page; it stays within the existing storage and Twitch terms notes, caching only IDs, titles and cover IDs).
+- [x] Verify the PopScore endpoint, the visits `popularity_type` ID and the response shape against the official IGDB docs and one live request from a throwaway scratchpad script (IDs and counts only, no credentials printed), and record it in `docs/research/`. **Done:** `docs/research/igdb-popscore.md`.
+- [x] Confirm the cache time, and whether results' titles should link to the detail page. **Done:** one hour; titles link (user decisions).
+- [x] Add a short PRD addendum (a new user story for the popular row and the IGDB detail page; it stays within the existing storage and Twitch terms notes, caching only IDs, titles and cover IDs). **Done:** stories 120–126, plus "Popular on IGDB and the IGDB game page" under Implementation Decisions.
 
 ### Manual verification (browser, live IGDB)
 
@@ -580,6 +606,7 @@ Standard checks, plus client tests with mocked HTTP (PopScore query body, rank o
 3. Open the detail page for an unsaved game and click Save: lands on edit. Open it again: the link to my entry replaces Save.
 4. As the other demo user, open the same game: Save is shown, not a link to the first user's entry.
 5. Turn off Wi-Fi with the cache cleared (restart the server): the blank search page loads with a working search box and no row. A stored game's detail page still shows its details.
+6. Search a title, then click a result's title: it opens the same detail page. The result's Save or Saved control is still on the results page.
 
 ### Commit
 
@@ -786,7 +813,7 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Phase 6: Search, filters, Theme, sorts and pagination (no browser issues reported; RQ4 screenshot pending)
 - [x] Phase 7: IGDB client and IGDB search page (ordering kept as a known limitation; B2 and B3 screenshots pending)
 - [x] Phase 8: Save a game from search (browser steps not reported individually)
-- [ ] Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page (recorded 2026-11-15; implement after the Phase 8 commit, before Phase 9)
+- [x] Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page (recorded and completed 2026-11-15, before Phase 9)
 - [ ] Phase 9: Refresh from IGDB
 - [ ] Phase 10: Saved-entry REST API
 - [ ] Phase 11: Command-line client (lesson checkpoint)

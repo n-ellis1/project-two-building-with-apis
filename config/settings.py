@@ -38,6 +38,9 @@ ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 IGDB_CLIENT_ID = os.environ.get("IGDB_CLIENT_ID", "")
 IGDB_CLIENT_SECRET = os.environ.get("IGDB_CLIENT_SECRET", "")
 
+# Keeps `manage.py test` offline: no real IGDB credentials and no real HTTP in tests.
+TEST_RUNNER = "config.test_runner.OfflineTestRunner"
+
 INSTALLED_APPS = [
     # games comes first so its templates (for example registration/) take priority.
     "games",

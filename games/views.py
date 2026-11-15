@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.cache import patch_vary_headers
@@ -11,7 +12,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from . import igdb
 from .forms import EntryForm, SignupForm
-from .models import Entry
+from .models import Entry, Game, is_eligible
 from .queries import (
     MAX_SEARCH_LENGTH,
     PAGE_SIZE,
@@ -222,13 +223,79 @@ def search(request):
     context["q"] = q
     context["first_page_url"] = search_url(q)
 
-    if is_htmx_swap(request):
+    htmx_swap = is_htmx_swap(request)
+    # The row sits outside the swapped region, so only a full blank page needs it.
+    context["popular"] = popular_row(request.user) if not q and not htmx_swap else []
+
+    if htmx_swap:
         response = render(request, "games/_search_region.html", context)
         response["HX-Push-Url"] = search_url(q, page)
     else:
         response = render(request, "games/search.html", context)
     patch_vary_headers(response, ["HX-Request", "HX-History-Restore-Request"])
     return response
+
+
+@login_required
+def igdb_game(request, igdb_id):
+    """Any IGDB game by IGDB ID, saved or not (login is checked before any IGDB call).
+
+    - **Stored Game:** read from SQLite with no IGDB call, so it works during an outage.
+    - **Not stored:** one `fetch_game` request. An unknown ID is a 404 with the fixed
+      message; any other failure shows its fixed message with links to My Saved Games
+      and Search IGDB.
+
+    If I already saved it, the page links to **my** entry (owner-scoped lookup).
+    Otherwise an eligible game gets a Save button on the existing `/search/save/`
+    flow, and an ineligible one gets only the excluded message.
+    """
+    if igdb_id > MAX_IGDB_ID or igdb_id < 1:
+        raise Http404
+    context = {"game": None, "platforms": [], "error": None, "saved_entry_id": None}
+
+    stored = Game.objects.filter(igdb_id=igdb_id).prefetch_related("platforms").first()
+    if stored is not None:
+        game = stored
+        context["platforms"] = [platform.name for platform in stored.platforms.all()]
+    else:
+        try:
+            game = igdb.fetch_game(igdb_id)
+        except igdb.IgdbError as error:
+            # A failed save from this page redirects here with the same fixed message
+            # (and its My Saved Games link) already queued, so show it only once.
+            pending = {str(message) for message in messages.get_messages(request)}
+            context["error"] = None if error.message in pending else error.message
+            # Upstream and configuration failures get the My Saved Games link.
+            context["error_saved_games_link"] = error.code not in NO_LINK_CODES
+            status = 404 if error.code == "igdb_game_not_found" else 200
+            return render(request, "games/igdb_game.html", context, status=status)
+        context["platforms"] = [platform.name for platform in game.platforms]
+
+    context["game"] = game
+    context["igdb_id"] = igdb_id
+    context["saved_entry_id"] = (
+        owned_entries(request.user)
+        .filter(game__igdb_id=igdb_id)
+        .values_list("pk", flat=True)
+        .first()
+    )
+    context["eligible"] = is_eligible(game.game_category, game.version_parent)
+    context["excluded_message"] = igdb.MESSAGES["game_category_excluded"]
+    return render(request, "games/igdb_game.html", context)
+
+
+def popular_row(user) -> list[dict]:
+    """The "Popular on IGDB" row for the blank search page, or [] when the feed fails.
+
+    The game list is shared and cached by the client. The Saved links are looked up
+    here, for this user, on every request, so they never enter the cache. A failure
+    just leaves the row out: no banner, and searching works as usual.
+    """
+    try:
+        games = igdb.cached_popular_games()
+    except igdb.IgdbError:
+        return []
+    return with_saved_entries(user, games)
 
 
 def clean_search_text(value) -> str:
@@ -244,6 +311,8 @@ MAX_IGDB_ID = 2_147_483_647
 SAVED_GAMES_LINK_TAG = "saved-games-link"
 NO_LINK_CODES = {"igdb_game_not_found", "game_category_excluded"}
 ALREADY_SAVED_MESSAGE = "Already in your games"
+# The one recognised `return_to` value on /search/save/ (the IGDB game page's Save form).
+RETURN_TO_IGDB_GAME = "igdb_game"
 
 
 def parse_igdb_id(value) -> int | None:
@@ -265,27 +334,36 @@ def search_save(request):
     - **Already mine:** to my existing entry, with "Already in your games".
     - **Failure:** back to the same search (`q`, `page`) with the fixed message. The
       message is stored in the session, so it still shows even if reloading the
-      results fails too.
+      results fails too. A save from the IGDB game page (`return_to=igdb_game`) goes
+      back to that page instead.
+
+    The failure destination is only ever one of our own routes, built here with
+    `reverse()`: `return_to` is matched as a name, never used as a URL, and the
+    detail page URL is rebuilt from the validated IGDB ID. Any posted `next` or
+    URL is ignored.
     """
     q = clean_search_text(request.POST.get("q", ""))
     page = parse_page(request.POST.get("page"))
-    back_to_search = search_url(q, page)
-
     igdb_id = parse_igdb_id(request.POST.get("igdb_id"))
+    if request.POST.get("return_to") == RETURN_TO_IGDB_GAME and igdb_id is not None:
+        failure_url = reverse("games:igdb_game", args=[igdb_id])
+    else:
+        failure_url = search_url(q, page)
+
     if igdb_id is None:
         # Never sent to IGDB: it can't be a real game ID.
         messages.error(request, igdb.MESSAGES["igdb_game_not_found"])
-        return redirect(back_to_search)
+        return redirect(failure_url)
 
     try:
         result = save_game(request.user, igdb_id)
     except igdb.IgdbError as error:
         tags = "" if error.code in NO_LINK_CODES else SAVED_GAMES_LINK_TAG
         messages.error(request, error.message, extra_tags=tags)
-        return redirect(back_to_search)
+        return redirect(failure_url)
     except SaveFailed as error:
         messages.error(request, error.message, extra_tags=SAVED_GAMES_LINK_TAG)
-        return redirect(back_to_search)
+        return redirect(failure_url)
 
     if not result.created:
         messages.info(request, ALREADY_SAVED_MESSAGE)

@@ -1,0 +1,62 @@
+{% extends "games/base.html" %}
+{% load game_covers %}
+{% block title %}{% if game %}{{ game.name }}{% else %}IGDB game{% endif %}{% endblock %}
+{% block content %}
+<p class="mb-3"><a href="{% url 'games:search' %}" data-testid="search-return">&larr; Search IGDB</a></p>
+{% if not game %}
+  {# error is empty when the same message is already shown above as a flash message. #}
+  {% if error %}
+    <div class="alert alert-danger" role="alert" data-testid="igdb-game-error">
+      {{ error }}
+      {% if error_saved_games_link %}
+        <a class="alert-link ms-1" href="{% url 'games:saved_games' %}">Go to My Saved Games</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% else %}
+<div class="row g-4" data-testid="igdb-game" data-igdb-id="{{ igdb_id }}">
+  <div class="col-12 col-md-auto">
+    {% cover_img game "large" %}
+  </div>
+  <div class="col">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <h1 class="h3 mb-0">{{ game.name }}</h1>
+      {% if game.category_badge %}
+        <span class="badge text-bg-info" data-testid="category-badge">{{ game.category_badge }}</span>
+      {% endif %}
+    </div>
+    {% if game.summary %}<p data-testid="summary">{{ game.summary|linebreaksbr }}</p>{% endif %}
+
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Release date</dt>
+      <dd class="col-sm-8" data-testid="release-date">{{ game.first_release_date|date:"F j, Y"|default:"Unknown" }}</dd>
+      <dt class="col-sm-4">Platforms</dt>
+      <dd class="col-sm-8" data-testid="platforms">{{ platforms|join:", "|default:"Unknown" }}</dd>
+    </dl>
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+      {% if saved_entry_id %}
+        <span class="badge text-bg-success">In My Saved Games</span>
+        <a class="btn btn-outline-success" data-testid="saved-link"
+           href="{% url 'games:entry_detail' saved_entry_id %}">Open my entry</a>
+      {% elif eligible %}
+        {# The existing save flow. return_to names our own detail route; the view #}
+        {# rebuilds the URL from the IGDB ID and never redirects to a posted URL. #}
+        <form method="post" action="{% url 'games:search_save' %}" class="m-0" data-testid="save-form">
+          {% csrf_token %}
+          <input type="hidden" name="igdb_id" value="{{ igdb_id }}">
+          <input type="hidden" name="return_to" value="igdb_game">
+          <button type="submit" class="btn btn-primary">Save</button>
+        </form>
+      {% else %}
+        <p class="text-body-secondary mb-0" data-testid="excluded-message">{{ excluded_message }}</p>
+      {% endif %}
+    </div>
+
+    <p class="small text-body-secondary mt-4 mb-0" data-testid="igdb-attribution">
+      {% if game.igdb_url %}<a href="{{ game.igdb_url }}" rel="noopener">Data from IGDB</a>{% else %}Data from IGDB{% endif %}
+    </p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

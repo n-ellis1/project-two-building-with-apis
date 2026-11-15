@@ -28,6 +28,70 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page
+
+### Prompts
+1. `/implement` Read CLAUDE.md and the Popular on IGDB follow-up in plans/video-game-tracker.md. Implement that follow-up before Phase 9.
+
+   Verify IGDB's visits ranking against the official docs and a live request. On the blank Search IGDB page, show up to 10 eligible games in rank order in a horizontally scrollable row. Each card should show the actual cover art and title as one link. Use the existing placeholder if a cover is missing or fails to load.
+
+   Clicking a card should open the in-app discovery detail page by IGDB ID, even if I haven't saved the game. Show a larger cover, summary, release date, and platforms. Use the existing Save flow, or link to my own saved entry if I've already saved it. Include a link back to Search IGDB.
+
+   Use the proposed one-hour cache, keep the search box usable if the feed fails, and record the feature in the PRD. Run the standard checks and pause for my browser verification before staging, committing, or starting Phase 9.
+2. I approve all three TDD behaviors. Also link search result titles to the discovery detail page by IGDB ID. Keep the existing Save and Saved controls on search results so I can still save or open my entry directly.
+
+   Start with the ranking and eligibility test. Verify that the client restores PopScore rank order even when the game metadata arrives shuffled, skips ineligible games and missing records, and shows up to 10 eligible games. Run the focused test, show me the RED result, and pause before implementing.
+
+   For the later cache test, use the one-hour cache for shared game data only. Resolve Saved links separately for the signed-in user. For the save-return test, build the destination from our own route and the validated IGDB ID so a forged return URL can't redirect elsewhere.
+3. I approve the ranking RED test as written. Implement popular_games() using the existing IGDB client. Fetch the Visits ranking, then fetch the game details in one batch. Restore the original ranking order, skip missing and ineligible records, and return up to 10 games with their titles and cover IDs.
+
+   Rerun the focused ranking test and the full IGDB client test module. Show me the GREEN results and pause before starting the cache and feed-failure cycle.
+4. I accept the ranking GREEN result. Start the cache and feed-failure cycle. Test that the first blank Search IGDB load fetches the popularity row and a second load within the hour reuses it. Use two signed-in users to verify that shared cached game data doesn't carry over a Saved label or link from one account to the other.
+
+   Also test that a feed failure leaves the search box usable, hides the row, and lets the next blank-page load retry. A submitted title search should skip the popularity feed entirely.
+
+   Run the focused tests, show me the RED result, and pause before implementing the cache and view behavior.
+5. I approve the Cycle 2 RED tests as written. Implement the one-hour cache for shared game data only, and resolve Saved links separately for the signed-in user on each request.
+
+   Show the horizontally scrollable cover row only on the blank Search IGDB page. If the feed fails, leave the search box usable, omit the row, and let the next blank-page load retry. A title search should skip the feed entirely.
+
+   Keep the cover and title together as one link to the discovery detail route. Render any Saved link separately. Rerun the focused tests, show me the GREEN result, and pause before the detail-page save-return cycle.
+6. I accept the Cycle 2 GREEN result. Keep the offline test guard, document it in CLAUDE.md, and record the likely live calls and the fix in PROMPTS.md. Add the planned one-hour cache timeout test.
+
+   Build the discovery detail page as proposed. Verify that an unsaved game can be opened by IGDB ID, stored game details can load from SQLite during an outage, and any Saved link belongs to the signed-in user. Show a Save button only for eligible unsaved games. Link search result titles to the same detail page.
+
+   Then write the Cycle 3 test: a failed save from discovery should return to that game's in-app detail page with the safe error message, and a forged external return URL must never be used. Run the focused test, show me the RED result, and pause before implementing the save-return behavior.
+7. I approve the Cycle 3 RED test as written. On a failed save from discovery, return to the game's detail page by rebuilding the internal route from the validated IGDB ID. Use the existing Search IGDB return path for invalid IDs or unrecognized return_to values. Ignore any posted next URL and keep successful and duplicate saves behaving as they do now.
+
+   If the detail page also fails to load after the redirect, show the safe message once and keep the My Saved Games link available. Rerun the focused tests, confirm the forged redirect cases pass, and show me the GREEN result. Pause before wrapping up the follow-up.
+8. I accept the Cycle 3 GREEN result. Finish the Popular on IGDB follow-up documentation in the PRD, plan, CLAUDE.md, PROMPTS.md, and docs/verification.md. Record the duplicate error alert you found and fixed, and leave the browser results pending.
+
+   Give me a short browser checklist: scroll through the actual covers, click an unsaved game to open its discovery detail page, verify the larger cover and game details, save it, and reopen the card to check the Open my entry link. Also check that a typed search hides the popularity row and that a search result title opens the same detail page.
+
+   Stop for my browser verification before marking the follow-up complete, staging, committing, pushing, or starting Phase 9.
+9. I completed the Popular on IGDB browser walkthrough. The cover row scrolled, the cards opened the game detail pages, and saving a game took me to its edit page. When I reopened the card, it showed Saved and the detail page offered Open my entry. A title search hid the row, search result titles opened the detail page, and the row returned when I cleared the search.
+
+   Record these results in docs/verification.md and PROMPTS.md. Mark the follow-up complete in the plan and update CLAUDE.md. Rerun the five standard checks and show me the results, git status --short, and the planned commit message. Stop before staging, committing, pushing, or starting Phase 9.
+
+### Summary
+- **Browser result (2026-11-15): Pass.** The user reported that the row scrolled, cards opened the game page, Save landed on edit, and the reopened card showed Saved with "Open my entry". A title search hid the row and clearing brought it back, and result titles opened the game page. Not reported or not run: phone width, the cover placeholder, the result Save and Saved controls staying (title-link step), the other-demo-user check and the outage check. These are recorded as such in `docs/verification.md`, with their automated tests. The follow-up is marked complete in the plan.
+- **Outcome:** PopScore was verified first.
+  - **Docs and live run:** the official docs (`popularity_type = 1` is Visits, recalculated every 24 hours) and one live scratchpad run agreed. 49 of the top 50 were eligible (one Mod skipped). The run also showed that IGDB ignores the order of an `id = (…)` list and defaults to `limit 10`. Recorded in `docs/research/igdb-popscore.md`.
+  - **Three approved TDD cycles:**
+    - **Ranking and eligibility:** `igdb.popular_games()`.
+    - **Cache and feed failure:** `igdb.cached_popular_games()`, one hour, shared data only, plus `views.popular_row()` with per-user Saved links.
+    - **Save return:** `search_save`'s `return_to=igdb_game`, rebuilt from the validated ID.
+  - **Built normally:** the IGDB game page `/search/games/<igdb_id>/` (stored games from SQLite, unstored via `fetch_game`, Save only when eligible, my-entry link owner-scoped), search result title links, the row template, a one-hour expiry test with a fake cache clock, and the shared `igdb.category_badge()`.
+  - **Docs:** PRD stories 120–126 and an implementation section, the plan result, CLAUDE.md and `docs/verification.md` (browser steps pending).
+  - **Checks:** all five standard checks pass (263 tests).
+- **Deviations:** the user approved the TDD candidates as proposed and chose to link search result titles to the game page, keeping the Save and Saved controls. The user made the 1-hour cache and per-user Saved links explicit requirements. The user added requirements beyond the proposal: ignore any posted `next`, show the message once when the game page also fails, and add the planned cache-expiry test.
+- **Sideways:**
+  - **Live calls:** see the next bullet.
+  - **Test-side fixes:** the first detail-page tests failed because Django escapes apostrophes in messages (`&#x27;`). The assertions were fixed with `escape()`, not the code. A meaningless assertion was removed before it ran green. Ruff reformatted two files and shortened one long line.
+  - **Tests never seen failing:** Cycle 2's title-search test passed at RED (the view didn't call the feed yet), so it was never seen failing.
+  - **B4, the duplicate error alert:** after a failed save from the game page, an unstored game showed the same message twice. It was found in review after Cycle 3 went GREEN, before any browser run. A test was written first and failed (`2 != 1`), then the page was changed to leave out its own alert when the message is already queued. Recorded as B4 in `docs/verification.md`, with no browser screenshot because it never reached a browser.
+- **Live calls (details):** **Likely live Twitch and IGDB calls from the test suite.** After Cycle 2 went GREEN, the first regression run (`test_search`, `test_search_save`, `test_igdb_client`) loaded the real `.env`, because `manage.py test` reads it. `test_search`'s blank-search test mocked only `search_games`, so the new blank-page feed reached the real client. That was probably one token request and two IGDB requests (PopScore and games). Nothing was printed, logged or committed. It broke the rule that no automated test calls the real APIs, and it was caught by reviewing which tests load the blank page, not by a failing test. **Fix:** `config/test_runner.py` (`OfflineTestRunner`, set as `TEST_RUNNER`) blanks the IGDB credentials for every test, so an unmocked client raises `igdb_misconfigured` before any request. It also replaces `requests.post` for the whole run, so a test that sets fake credentials without mocking HTTP fails loudly. Tests that need the client still override both. `OfflineTestRunnerTests` proves the guard is active. The user kept the guard and asked for it to be documented in CLAUDE.md.
+
 ## 2026-11-15 — Phase 8: saving games from IGDB search, and the "Popular on IGDB" follow-up design
 
 ### Prompts

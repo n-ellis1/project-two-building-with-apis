@@ -1,0 +1,27 @@
+{% load game_covers %}
+{% comment %}
+  "Popular on IGDB": only on the blank search page, and left out entirely when the feed
+  fails or is empty. CSS-only horizontal scrolling with fixed-width cards. The cover and
+  title are one link to the IGDB game page; a Saved link (this user's own entry) sits
+  below it, never inside it.
+{% endcomment %}
+{% if popular %}
+<section class="mb-4" aria-labelledby="popular-heading" data-testid="popular-row">
+  <h2 id="popular-heading" class="h5 mb-1">Popular on IGDB</h2>
+  <p class="small text-body-secondary mb-2">Most visited game pages on IGDB.com.</p>
+  <ul class="list-unstyled d-flex gap-3 overflow-x-auto pb-2 mb-0">
+    {% for row in popular %}{% with game=row.game %}
+      <li class="flex-shrink-0" style="width: 90px" data-popular-id="{{ game.igdb_id }}">
+        <a href="{% url 'games:igdb_game' game.igdb_id %}" class="d-block link-body-emphasis text-decoration-none" data-testid="popular-card-link">
+          {% cover_img game "small" %}
+          <span class="d-block small mt-1 text-break">{{ game.name }}</span>
+        </a>
+        {% if row.saved_entry_id %}
+          <a class="badge text-bg-success text-decoration-none mt-1" data-testid="popular-saved-link"
+             href="{% url 'games:entry_detail' row.saved_entry_id %}">Saved</a>
+        {% endif %}
+      </li>
+    {% endwith %}{% endfor %}
+  </ul>
+</section>
+{% endif %}

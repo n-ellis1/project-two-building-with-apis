@@ -295,6 +295,36 @@ with Save forms on unsaved search results.
 
 No browser bugs or usability issues were found in Phase 8.
 
+### Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page
+
+**Result: Pass (2026-11-15).** Automated checks: all five standard checks pass, 263 tests. PopScore
+was verified against the official docs and one live run on 2026-11-15
+([research note](research/igdb-popscore.md)). The user ran the browser walkthrough with
+`uv run python manage.py runserver` and the real `.env`, and reported each result below. Parts the
+user didn't mention are recorded as not reported, with the automated test that covers them.
+
+| # | Step | Expected | Result | Date |
+|---|---|---|---|---|
+| 1 | Open Search IGDB with no term and scroll the "Popular on IGDB" row (also at phone width) | Up to 10 real covers with titles, scrolling sideways; a missing or failed cover shows the placeholder | **Pass**: the user confirmed the cover row scrolled. Phone width and the placeholder weren't reported. Automated: `PopularGamesTests`, `test_each_card_is_one_link_holding_the_cover_and_title` | 2026-11-15 |
+| 2 | Click an unsaved game's card | Its IGDB game page (`/search/games/<igdb_id>/`): larger cover, title, summary, release date, platforms, Save, "← Search IGDB" | **Pass**: the user confirmed the cards opened the game detail pages. The individual fields weren't reported one by one. Automated: `test_an_unsaved_unstored_game_opens_by_igdb_id_with_its_details_and_save` | 2026-11-15 |
+| 3 | Click Save, then go back to Search IGDB and click the same card again | Save lands on edit with "Added … to your games."; the card now has a Saved link, and the page shows "Open my entry" instead of Save | **Pass**: the user confirmed saving went to the edit page, and the reopened card showed Saved with "Open my entry" on the detail page. Automated: `test_new_and_duplicate_saves_from_the_page_behave_as_in_phase_8`, `test_my_saved_game_links_to_my_entry_and_another_users_shows_save`, `test_second_blank_load_reuses_the_cached_row_with_saved_links_per_user` | 2026-11-15 |
+| 4 | Type a title and search | The popular row disappears; clearing the search brings it back (from cache) | **Pass**: the user confirmed a title search hid the row, and the row returned after clearing the search. Automated: `test_a_title_search_never_requests_the_popular_feed`, `test_second_blank_load_reuses_the_cached_row_with_saved_links_per_user` | 2026-11-15 |
+| 5 | Click a search result's title | The same IGDB game page; the result's Save or Saved control is still on the results page | **Pass**: the user confirmed result titles opened the detail page. That the Save and Saved controls stayed wasn't reported. Automated: `test_result_titles_link_to_the_detail_page_and_save_controls_stay` | 2026-11-15 |
+| 6 | Optional: as the other demo user, open the game saved in step 3 | Save is shown, not a link to the first user's entry | Not run (optional). Automated: `test_my_saved_game_links_to_my_entry_and_another_users_shows_save` | |
+| 7 | Optional: Wi-Fi off, restart the server, open blank Search IGDB and a stored game's page | Search box works with no row and no error banner; the stored game's details still show | Not run (optional). Automated: `test_a_failed_feed_hides_the_row_keeps_search_usable_and_is_retried_next_load`, `test_a_stored_game_loads_from_sqlite_with_no_igdb_call_during_an_outage` | |
+
+What the follow-up added:
+- `igdb.popular_games()`: PopScore Visits, then one batched games request, with rank order restored
+  and ineligible or missing games skipped, up to 10.
+- `igdb.cached_popular_games()`: one hour, key `igdb:popular_games`, shared game data only.
+- `views.popular_row()`: Saved links per signed-in user, and nothing shown on failure.
+- The row template `_popular_row.html`, and the IGDB game page `views.igdb_game` with `igdb_game.html`.
+- Search result titles link to the game page.
+- `search_save` accepts `return_to=igdb_game` and rebuilds the destination from the validated IGDB ID.
+- An offline test guard (`config/test_runner.py`).
+
+Issue found and fixed during implementation, before any browser run: [B4](#b4-follow-up-after-phase-8-a-failed-save-from-the-igdb-game-page-showed-the-error-twice).
+
 ## Browser bugs and usability fixes (Reflection Question 5)
 
 Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** screenshot, the fix
@@ -438,6 +468,33 @@ Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** 
   (`search_fields` in `games/admin.py`) is a superuser debugging tool for finding exact rows, so it
   was left unchanged. `scripts/igdb_search.py` stays unchanged as the Phase 1 baseline. The Phase 10
   API search is recorded in the plan to reuse `resolve_saved_search()`.
+
+### B4 (follow-up after Phase 8): a failed save from the IGDB game page showed the error twice
+
+- **Found:** 2026-11-15, by Claude during implementation (reviewing the redirected page after the
+  Cycle 3 save-return passed), before any browser run.
+- **Reproduction:**
+  1. Sign in and open the IGDB game page of a game that isn't stored locally (from the popular row).
+  2. Make IGDB unavailable (Wi-Fi off, or restart with dummy credentials) without reloading the page.
+  3. Click **Save**.
+- **Expected:** back on the game's page with the safe message shown once, with the My Saved Games
+  link.
+- **Actual:** the same message twice: once as the save's flash message (with the link) and once as the
+  page's own error alert (with a second link), because the page also can't fetch the game.
+- **Before screenshot:** **not applicable.** It was found in code and tests and fixed before any
+  browser run, so no browser screenshot exists. The failing test is the evidence (below).
+- **Fix:** when the page's own error is the same text as a queued flash message, the page leaves its
+  alert out (`games/views.py:266`–`267`). The template now chooses between the error view and the
+  details view by whether a game loaded (`games/templates/games/igdb_game.html:6`), and shows its
+  own alert only when there's an error to show (`:8`). With no pending message, the page still shows
+  its own error.
+- **After screenshot:** not captured. The browser walkthrough (2026-11-15) didn't include the outage
+  save, so B4 relies on its tests. Capturing it is optional.
+- **Tests:** `test_when_the_page_also_fails_the_save_message_shows_once_with_the_link`
+  (`games/tests/test_igdb_game_page.py:224`) was written first and failed with `2 != 1` for
+  `igdb_timeout`, `igdb_unavailable` and `igdb_misconfigured`. It passes after the fix, along with
+  `test_with_no_pending_message_a_failed_page_still_shows_its_own_error` (`:238`). All five standard
+  checks pass (263 tests).
 
 ## Back/Forward query state (Reflection Question 4)
 

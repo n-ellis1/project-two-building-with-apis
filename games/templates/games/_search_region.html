@@ -24,7 +24,7 @@
         <div class="flex-shrink-0">{% cover_img game "small" %}</div>
         <div class="flex-grow-1">
           <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-            <span class="fw-semibold">{{ game.name }}</span>
+            <a class="fw-semibold" href="{% url 'games:igdb_game' game.igdb_id %}" data-testid="result-title-link">{{ game.name }}</a>
             {% if game.category_badge %}
               <span class="badge text-bg-info" data-testid="category-badge">{{ game.category_badge }}</span>
             {% endif %}

@@ -12,4 +12,6 @@ urlpatterns = [
     path("games/<int:entry_id>/delete/", views.entry_delete, name="entry_delete"),
     path("search/", views.search, name="search"),
     path("search/save/", views.search_save, name="search_save"),
+    # By IGDB ID, not Entry ID, so it can't be confused with /games/<entry id>/.
+    path("search/games/<int:igdb_id>/", views.igdb_game, name="igdb_game"),
 ]

@@ -40,7 +40,11 @@ class FakeHttp:
     """Stands in for `requests.post`, answering Twitch and IGDB from queued responses.
 
     A queued exception (for example `requests.Timeout`) is raised instead of returned.
+    Every IGDB endpoint shares one queue, in request order; `igdb_urls()` says which
+    endpoint each request went to.
     """
+
+    IGDB_URLS = (igdb.IGDB_GAMES_URL, igdb.IGDB_POPULARITY_URL)
 
     def __init__(self, twitch=(), igdb_responses=()):
         self.twitch = list(twitch)
@@ -52,10 +56,13 @@ class FakeHttp:
         if url == igdb.TOKEN_URL:
             self.twitch_calls.append(kwargs)
             return self._answer(self.twitch.pop(0))
-        if url == igdb.IGDB_GAMES_URL:
-            self.igdb_calls.append(kwargs)
+        if url in self.IGDB_URLS:
+            self.igdb_calls.append({"url": url, **kwargs})
             return self._answer(self.igdb.pop(0))
         raise AssertionError(f"unexpected URL {url}")
+
+    def igdb_urls(self):
+        return [call["url"] for call in self.igdb_calls]
 
     @staticmethod
     def _answer(item):
@@ -428,6 +435,90 @@ class RequestAndParsingTests(SimpleTestCase):
         self.assertEqual(witcher.platforms, ())
         self.assertEqual(witcher.cover_image_id, "")
         self.assertEqual(old.first_release_date, date(1969, 12, 31))
+
+
+class OfflineTestRunnerTests(SimpleTestCase):
+    """config.test_runner keeps every test offline, even with the real .env loaded."""
+
+    def test_igdb_credentials_are_blank_so_an_unmocked_client_makes_no_request(self):
+        with self.assertRaises(igdb.IgdbError) as raised:
+            igdb.popular_games()
+        self.assertEqual(raised.exception.code, "igdb_misconfigured")
+
+    @override_settings(IGDB_CLIENT_ID=FAKE_CLIENT_ID, IGDB_CLIENT_SECRET=FAKE_SECRET)
+    def test_unmocked_http_with_fake_credentials_fails_loudly(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        with self.assertRaisesRegex(AssertionError, "real HTTP request"):
+            igdb.search_games("zelda", 1)
+
+
+def popscore_ids(count):
+    """IGDB IDs for PopScore ranks 1..count (rank r is game 1000 + r)."""
+    return [1000 + rank for rank in range(1, count + 1)]
+
+
+@override_settings(IGDB_CLIENT_ID=FAKE_CLIENT_ID, IGDB_CLIENT_SECRET=FAKE_SECRET)
+class PopularGamesTests(SimpleTestCase):
+    """TDD cycle 1 (follow-up after Phase 8): `popular_games()` from PopScore Visits."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    def test_rank_order_is_restored_skipping_ineligible_and_missing_games_up_to_ten(self):
+        ranked = popscore_ids(16)
+        primitives = [
+            {"id": 9000 + i, "game_id": game_id, "popularity_type": 1, "value": 1.0 - i / 100}
+            for i, game_id in enumerate(ranked)
+        ]
+        missing = {1003, 1007}  # IGDB returns no record for these ranks
+        ineligible = {
+            1002: {"game_type": 3},  # Bundle
+            1005: {"game_type": 0, "version_parent": 1001},  # an edition
+        }
+        records = [
+            {
+                "id": game_id,
+                "name": f"Game {game_id}",
+                "game_type": 0,
+                "cover": {"id": game_id, "image_id": f"co{game_id}"},
+                **ineligible.get(game_id, {}),
+            }
+            for game_id in ranked
+            if game_id not in missing
+        ]
+        records.reverse()  # metadata arrives in a different order from the ranking
+        records.insert(4, records.pop(0))
+        fake = FakeHttp(
+            twitch=[token_response(FAKE_TOKEN_1)],
+            igdb_responses=[FakeResponse(200, primitives), FakeResponse(200, records)],
+        )
+
+        with mock.patch("games.igdb.requests.post", side_effect=fake):
+            games = igdb.popular_games()
+
+        # Ranks 1, 4, 6 and 8-14: rank order kept, 2/5 (ineligible) and 3/7 (missing)
+        # skipped, and ranks 15-16 cut off after ten games.
+        expected = [1001, 1004, 1006, 1008, 1009, 1010, 1011, 1012, 1013, 1014]
+        self.assertEqual([game.igdb_id for game in games], expected)
+        self.assertEqual(games[0].name, "Game 1001")
+        self.assertEqual(games[0].cover_image_id, "co1001")
+
+        # Two IGDB requests: the Visits ranking, then those games in one request.
+        self.assertEqual(fake.igdb_urls(), [igdb.IGDB_POPULARITY_URL, igdb.IGDB_GAMES_URL])
+        popularity_body, games_body = (body.decode("utf-8") for body in fake.igdb_bodies())
+        popularity_lines = popularity_body.splitlines()
+        self.assertIn("where popularity_type = 1;", popularity_lines)
+        self.assertIn("sort value desc;", popularity_lines)
+        self.assertIn("limit 50;", popularity_lines)
+        games_lines = games_body.splitlines()
+        self.assertIn(
+            "where version_parent = null & game_type = (0,1,2,4,6,7,8,9,10,11,12)"
+            f" & id = ({','.join(map(str, ranked))});",
+            games_lines,
+        )
+        self.assertIn("limit 50;", games_lines)  # IGDB's default limit is only 10
 
 
 @override_settings(IGDB_CLIENT_ID=FAKE_CLIENT_ID, IGDB_CLIENT_SECRET=FAKE_SECRET)

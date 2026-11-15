@@ -174,6 +174,16 @@ Saved entries are private: each user sees and changes only their own, and attemp
 118. As a developer, I want demo passwords read from my ignored environment file, with the command stopping with a clear message if the password is missing, so that no real credentials are committed.
 119. As a developer, I want a documented manual verification checklist, so that I can record evidence that each requirement works.
 
+### Discovering games (added 2026-11-15, follow-up after Phase 8)
+
+120. As a user, I want the blank Search IGDB page to show a horizontally scrollable "Popular on IGDB" row of up to 10 of the games most visited on IGDB.com, each with its cover and title, so that I can discover games without knowing what to type.
+121. As a user, I want the popular row to leave out the same editions, bundles, mods, packs and updates that search leaves out, so that everything in it can be saved.
+122. As a user, I want the popular row to disappear while I'm searching and the search box to keep working when the row can't load, so that discovery never gets in the way of searching.
+123. As a user, I want to open any IGDB game inside the tracker by its IGDB ID, from the popular row or a search result title, with a large cover, summary, release date and platforms, so that I can look at a game before saving it.
+124. As a user, I want that page to link to my own entry if I've already saved the game, or offer Save if it's eligible, so that I can act on what I see.
+125. As a user, I want a failed save from that page to bring me back to it with the safe message, so that I don't lose my place.
+126. As a user, I want that page to work for games already stored locally even when IGDB is down, so that discovery degrades like the rest of the app.
+
 ## Implementation Decisions
 
 ### Stack and structure
@@ -261,6 +271,20 @@ Saved entries are private: each user sees and changes only their own, and attemp
 - Pager links keep the query, and a new search starts on page 1. Missing, non-numeric, zero or negative page values are treated as page 1.
 - An empty page 1 shows "No matches.". An empty later page shows "No more results" with a link to page 1. Errors are shown separately from either empty message.
 - Results the user has already saved show a "Saved" link to their entry, found with one local query per results page.
+- Each result's title links to the IGDB game page (below). The Save and Saved controls stay on the result.
+
+### Popular on IGDB and the IGDB game page (added 2026-11-15)
+
+- **Source:** IGDB PopScore's Visits ranking (`popularity_primitives` with `popularity_type = 1`). It holds game IDs only, so the client makes two requests: the top 50 primitives (`sort value desc`), then those games in one request with the search eligibility clause plus `id = (…)` and `limit 50`. The client restores PopScore's order, skips missing records and anything that fails the Python eligibility rule, and keeps the first 10. Evidence: [docs/research/igdb-popscore.md](../docs/research/igdb-popscore.md).
+- **Cache:** the finished row (IDs, titles, cover IDs, Game Category) is cached for one hour under `igdb:popular_games`. It's one shared row for every user, so it holds no per-user data and no secrets. PopScore itself is recalculated every 24 hours. A failure is never cached.
+- **Saved links:** the row's Saved links are looked up for the signed-in user on every request (one owner-scoped query), never cached.
+- **When shown:** only on a full, blank Search IGDB page. A title search and an HTMX pager swap never request the feed. If the feed fails or is empty, the row is left out with no message, and searching works as usual.
+- **Cards:** a CSS-only horizontal scroller of fixed-width cards. The small cover (with the shared placeholder fallback) and the title are one link to the IGDB game page. A Saved link to the user's own entry sits below the card's link, not inside it.
+- **IGDB game page** (`/search/games/<igdb_id>/`, login required):
+  - A stored Game is read from SQLite with no IGDB call, so it works during an outage. An unstored game is fetched once with the same fetch-by-ID used for saving. Opening a game never stores it.
+  - The page shows the large cover, title, Game Category badge, summary, release date, platforms and an IGDB attribution link.
+  - Actions: if the user saved it, a link to their own entry (owner-scoped). Otherwise, an eligible game gets Save (the existing save flow), and an ineligible game shows only the `game_category_excluded` message.
+  - Errors: an unknown ID (or one too large to be a game) is a 404 with `igdb_game_not_found`. Any other failure shows its fixed message with the My Saved Games link. There's always a link back to Search IGDB.
 
 ### Save service
 
@@ -272,6 +296,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
 - Simultaneous saves: if creating the Entry raises a database integrity error, the service re-checks for an existing entry belonging to **the same user for the same game**. Only when that entry is confirmed is the request treated as a duplicate (with the duplicate responses above). Any other database error, including an integrity error with no such entry, is not reported as a duplicate. It is handled as an unexpected server error and shown to the user only as a generic safe message.
 - After a successful new save on the website, redirect to the entry's edit page.
 - On a website save failure, return to the same search query and page with the error message. The error is still shown if reloading the results also fails.
+- A save from the IGDB game page posts `return_to=igdb_game`. A failure then returns to that game's page instead, rebuilt from the validated IGDB ID on our own route. `return_to` is matched as a name, never used as a URL, and any posted `next` is ignored. Unrecognised values, or an invalid ID, fall back to the search return. If that page can't load the game either, the message shows once, with the My Saved Games link. New saves and duplicates behave as above.
 
 ### Refresh
 
@@ -328,8 +353,9 @@ Saved entries are private: each user sees and changes only their own, and attemp
 | Entry edit (by entry ID) | Tracking-field form with the shared validation; the landing page after a new save |
 | Entry delete (by entry ID) | GET shows a confirmation page with the game title, explaining that status, rating, notes and hours played will be deleted, with a Cancel link to detail and a "Remove from My Games" button. Only a CSRF-protected POST removes the entry, then redirects to My Saved Games with a confirmation message. Both GET and POST are owner-scoped. |
 | Entry refresh (by entry ID) | POST only; redirects back to detail with a message |
-| IGDB search | Query and page parameters, Previous/Next, Saved links, Game Category badges |
-| Save from search | POST only; carries the IGDB ID plus the current query and page so errors return to the same results |
+| IGDB search | Query and page parameters, Previous/Next, Saved links, Game Category badges, result titles linking to the IGDB game page; the "Popular on IGDB" row when there's no search term |
+| IGDB game page (by IGDB ID) | Any IGDB game, saved or not: large cover, details, a link to my entry or Save, a link back to Search IGDB |
+| Save from search | POST only; carries the IGDB ID plus the current query and page so errors return to the same results, or `return_to=igdb_game` from the IGDB game page |
 
 - The base template has navigation (My Saved Games, Search IGDB, the signed-in username, a Logout button), a messages area, and a footer reading "Game data and cover art from IGDB.com", linked to IGDB, on every page.
 
@@ -447,6 +473,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
 - **Unresolved: Twitch storage terms.** The IGDB FAQ says local storage is allowed and preferred, but the Twitch Developer Services Agreement it points to has a 24-hour caching clause. It isn't clear whether the FAQ counts as the written authorization that clause allows, or whether the clause covers IGDB at all. The design stores saved metadata, keeps a last-fetched time, and offers manual refresh. The question stays documented as open (see the API comparison research).
 - **Verified and decided 2026-11-14:** the Game Category field is `game_type` (15 values, IDs 0–14), and editions are identified by `version_parent`, because some editions are typed Main Game (for example *Dark Souls III: Day One Edition*). The keep/exclude allowlist is in the Game Category rules. Evidence: [docs/research/igdb-game-types.md](../docs/research/igdb-game-types.md).
 - **Checked 2026-11-15 (Phase 7): IGDB search ordering.** Two logically equivalent "Resident Evil 2" queries had returned the same records in a different order in Phase 1. In Phase 7, three repeated runs of the same `star` search through the app's IGDB client returned identical ordered IDs on pages 1 and 2, with no overlap between the pages. Separately, changing the `limit` or `offset` changed the order of some results (IGDB appears to order equally ranked results by request window). A duplicate or skipped result at a page boundary is therefore possible, though neither was observed in this check. **Decision:** keep the query and IGDB's relevance order (no `sort`), and treat this as a known limitation. Evidence: [docs/research/igdb-game-types.md](../docs/research/igdb-game-types.md) section 5 and `docs/verification.md`.
+- **Verified 2026-11-15 (follow-up after Phase 8): IGDB PopScore.** The official docs and a live run agree that Visits is `popularity_type = 1` (source 121, IGDB), and that values are recalculated every 24 hours. 49 of the live top 50 were eligible (one Mod was skipped). IGDB doesn't return games in the order of an `id = (…)` list, and its default limit is 10, so the client restores the order and sets the limit. The row caches only IDs, titles, cover IDs and Game Category for one hour, within the storage notes above. Evidence: [docs/research/igdb-popscore.md](../docs/research/igdb-popscore.md).
 - **To confirm during planning:** the styling and interactivity choices from the lesson (for example, the CSS approach and any front-end interactivity beyond the cover-fallback script) aren't decided in this PRD and must be confirmed before implementation.
 - Covers are hotlinked rather than downloaded because none of the providers clearly allows re-hosting images.
 - IGDB's limits (4 requests per second, 8 open requests, 25 active tokens, about 60-day token life) shaped the one-request-per-page search, token caching, the single 401 retry and the refresh throttle.

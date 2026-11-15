@@ -17,6 +17,7 @@ from django.core.cache import cache
 
 TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 IGDB_GAMES_URL = "https://api.igdb.com/v4/games"
+IGDB_POPULARITY_URL = "https://api.igdb.com/v4/popularity_primitives"
 TIMEOUT_SECONDS = 10
 
 # The Twitch app token lives in Django's local-memory cache under a fixed key that
@@ -26,6 +27,18 @@ TOKEN_EXPIRY_MARGIN_SECONDS = 300
 
 # Results shown per IGDB search page; one extra is requested to know whether Next exists.
 SEARCH_PAGE_SIZE = 10
+
+# "Popular on IGDB": PopScore's Visits ranking (popularity type 1). More candidates are
+# asked for than shown, so ineligible or missing games can be skipped.
+VISITS_POPULARITY_TYPE = 1
+POPULAR_CANDIDATES = 50
+POPULAR_LIMIT = 10
+
+# The finished row is shared game data only (IDs, titles, cover IDs, categories), the
+# same for every user, so it is cached under a fixed key with no secrets or user IDs.
+# PopScore itself is recalculated every 24 hours.
+POPULAR_CACHE_KEY = "igdb:popular_games"
+POPULAR_CACHE_SECONDS = 60 * 60
 
 # The approved Phase 1 eligibility rule, applied by IGDB before limit and offset.
 ELIGIBILITY_WHERE = "where version_parent = null & game_type = (0,1,2,4,6,7,8,9,10,11,12);"
@@ -82,14 +95,19 @@ class IgdbGame:
 
     @property
     def category_badge(self) -> str:
-        from .models import GameCategory
+        return category_badge(self.game_category)
 
-        if self.game_category in (None, GameCategory.MAIN_GAME):
-            return ""
-        try:
-            return GameCategory(self.game_category).label
-        except ValueError:
-            return ""
+
+def category_badge(game_category) -> str:
+    """IGDB's label for a non-main Game Category; empty for Main Game, missing or unknown."""
+    from .models import GameCategory
+
+    if game_category in (None, GameCategory.MAIN_GAME):
+        return ""
+    try:
+        return GameCategory(game_category).label
+    except ValueError:
+        return ""
 
 
 @dataclass(frozen=True)
@@ -120,6 +138,10 @@ class IgdbGameDetails:
     platforms: tuple[IgdbNamed, ...] = ()
     genres: tuple[IgdbNamed, ...] = ()
     themes: tuple[IgdbNamed, ...] = ()
+
+    @property
+    def category_badge(self) -> str:
+        return category_badge(self.game_category)
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +377,68 @@ def fetch_game(igdb_id: int) -> IgdbGameDetails:
         genres=_named(record.get("genres")),
         themes=_named(record.get("themes")),
     )
+
+
+def build_popularity_query() -> str:
+    """The top PopScore Visits primitives, highest first (see docs/research/igdb-popscore.md)."""
+    return (
+        "fields game_id, value;\n"
+        f"where popularity_type = {VISITS_POPULARITY_TYPE};\n"
+        "sort value desc;\n"
+        f"limit {POPULAR_CANDIDATES};\n"
+    )
+
+
+def build_games_by_id_query(igdb_ids) -> str:
+    """Eligible games among `igdb_ids`, in one request. The explicit limit matters:
+    IGDB's default of 10 would silently drop the rest."""
+    ids = ",".join(str(int(igdb_id)) for igdb_id in igdb_ids)
+    eligible = ELIGIBILITY_WHERE.removesuffix(";")
+    return f"{SEARCH_FIELDS}\n{eligible} & id = ({ids});\nlimit {POPULAR_CANDIDATES};\n"
+
+
+def popular_games() -> list[IgdbGame]:
+    """Up to 10 eligible games in IGDB PopScore Visits order. Two IGDB requests.
+
+    The ranking holds game IDs only, so those games are fetched in one batch. IGDB
+    returns them in its own order, so PopScore's order is restored here. Missing
+    records and ineligible ones (checked again in Python, the same rule as saving)
+    are skipped, and the following ranks fill in.
+    """
+    from .models import is_eligible
+
+    primitives = _query(IGDB_POPULARITY_URL, build_popularity_query())
+    if not isinstance(primitives, list):
+        raise IgdbError("igdb_unavailable")
+    ranked = []
+    for primitive in primitives:
+        game_id = primitive.get("game_id") if isinstance(primitive, dict) else None
+        if _is_id(game_id) and game_id not in ranked:
+            ranked.append(game_id)
+    ranked = ranked[:POPULAR_CANDIDATES]  # the games request's limit must cover them all
+    if not ranked:
+        return []
+
+    records = _query(IGDB_GAMES_URL, build_games_by_id_query(ranked))
+    if not isinstance(records, list):
+        raise IgdbError("igdb_unavailable")
+    by_id = {}
+    for record in records:
+        game = _to_game(record)
+        version_parent = record.get("version_parent") if game else None
+        if game is not None and is_eligible(game.game_category, version_parent):
+            by_id[game.igdb_id] = game
+    return [by_id[game_id] for game_id in ranked if game_id in by_id][:POPULAR_LIMIT]
+
+
+def cached_popular_games() -> list[IgdbGame]:
+    """`popular_games()`, cached for an hour. A failure raises `IgdbError` and is never
+    cached, so the next call tries again. Per-user data (Saved links) never goes in."""
+    games = cache.get(POPULAR_CACHE_KEY)
+    if games is None:
+        games = popular_games()
+        cache.set(POPULAR_CACHE_KEY, games, POPULAR_CACHE_SECONDS)
+    return games
 
 
 def search_games(q: str, page: int) -> list[IgdbGame]:
