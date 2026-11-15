@@ -42,6 +42,38 @@ Note: the vendored Bootstrap 5.3.8 files had their trailing `sourceMappingURL` c
 `games/static/games/vendor/bootstrap-5.3.8/SOURCE.md`), so DevTools doesn't request missing `.map`
 files.
 
+### Phase 3: Models, admin, demo seed and a basic My Saved Games list
+
+**Result: Pass (2026-11-15).** Automated checks: all five standard checks pass, 63 tests. Manual
+steps run by the user in the browser and PowerShell with `uv run python manage.py runserver`, after
+adding `DEMO_PASSWORD` to `.env` (its value isn't recorded) and running `migrate`.
+
+| # | Step | Expected | Result | Date |
+|---|---|---|---|---|
+| 1 | `uv run python manage.py seed_demo`, then run it again | First run creates 2 demo users, 27 games and 28 entries; the rerun reports `0 created` on every line | Pass: expected users, games and entries created; rerun created nothing | 2026-11-15 |
+| 2 | Sign in as `demo_a`, page 1 | "Showing 1–10 of 15", Page 1 of 2, Next link; Game Category badges (Port, Remake, Remaster, Expansion) on non-main games only | Pass: badges displayed correctly | 2026-11-15 |
+| 3 | `demo_a`: click Next | Page 2 with the remaining 5 entries (including DLC and Standalone Expansion badges), Previous link, no Next | Pass | 2026-11-15 |
+| 4 | `/games/?page=0`, `?page=abc`, `?page=-1`, then `?page=99` | Page 1 for the first three; the last page for 99 | Pass | 2026-11-15 |
+| 5 | Sign in as `demo_b`; check pages 1, 2 and 99 | Only B's 13 entries; none of A's own games (Dark Souls III, Resident Evil 2, Silent Hill 2, Dead Space). The Witcher 3 appears because both users saved it | Pass: each demo account showed only its own entries | 2026-11-15 |
+| 6 | `changepassword demo_a`, rerun `seed_demo`, sign in | Only the new password works; the seed doesn't reset it | Pass | 2026-11-15 |
+| 7 | Run `seed_demo` with a throwaway `DJANGO_ENV_FILE` that has no `DEMO_PASSWORD` | Stops with "DEMO_PASSWORD is not set … Nothing was created." and creates nothing | Pass | 2026-11-15 |
+| 8 | `/admin/` as a superuser: open a Game, a Platform/Genre/Theme, and an Entry | Imported data is view-only (no Save, no Add); Entry status and other tracking fields save; owner and game aren't editable | Pass | 2026-11-15 |
+
+Automated coverage for the same behavior: `games/tests/test_models.py` (defaults, unique
+(owner, game), rating and hours constraints, Game kept on entry delete, badges),
+`games/tests/test_queries.py` (page helper table, owner-scoped 404),
+`games/tests/test_seed_demo.py` (rerun gives identical rows, passwords and edited entries kept,
+missing `DEMO_PASSWORD`, an unrelated account with a demo username stops the seed untouched, no
+network, seeded data properties, demo A page 2 and demo B isolation on pages 1, 2 and 99),
+`games/tests/test_saved_games.py` (isolation, order, tie-breakers, 10 per page, bad and past-the-end
+pages, badges, empty state, no network) and `games/tests/test_admin.py`.
+
+The demo fixture (`games/demo_data/seed.json`) holds real IGDB records fetched once on 2026-11-15
+by a throwaway scratchpad script that printed no credentials. The seed command and tests never
+contact IGDB.
+
+No browser bugs or usability issues were found in Phase 3.
+
 ## Browser bugs and usability fixes (Reflection Question 5)
 
 Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** screenshot, the fix

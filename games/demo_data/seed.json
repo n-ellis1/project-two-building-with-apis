@@ -1,0 +1,1895 @@
+{
+  "_comment": "Demo seed data for `manage.py seed_demo`. Game records are real IGDB data fetched on 2026-11-15 (no credentials stored). Entries are made up.",
+  "fetched_at": "2026-11-15T00:00:00Z",
+  "games": [
+    {
+      "igdb_id": 72,
+      "name": "Portal 2",
+      "slug": "portal-2",
+      "summary": "Sequel to the acclaimed Portal (2007), Portal 2 pits the protagonist of the original game, Chell, and her new robot friend, Wheatley, against more puzzles conceived by GLaDOS, an A.I. with the sole purpose of testing the Portal Gun's mechanics and taking revenge on Chell for the events of Portal. As a result of several interactions and revelations, Chell once again pushes to escape Aperture Science Labs.",
+      "first_release_date": "2011-04-18",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "co1rs4",
+      "igdb_url": "https://www.igdb.com/games/portal-2",
+      "platforms": [
+        {
+          "igdb_id": 3,
+          "name": "Linux"
+        },
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 9,
+          "name": "PlayStation 3"
+        },
+        {
+          "igdb_id": 12,
+          "name": "Xbox 360"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 8,
+          "name": "Platform"
+        },
+        {
+          "igdb_id": 9,
+          "name": "Puzzle"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 18,
+          "name": "Science fiction"
+        },
+        {
+          "igdb_id": 27,
+          "name": "Comedy"
+        }
+      ]
+    },
+    {
+      "igdb_id": 472,
+      "name": "The Elder Scrolls V: Skyrim",
+      "slug": "the-elder-scrolls-v-skyrim",
+      "summary": "Skyrim reimagines and revolutionizes the open-world fantasy epic, bringing to life a complete virtual world open for you to explore any way you choose. Play any type of character you can imagine, and do whatever you want; the legendary freedom of choice, storytelling, and adventure of The Elder Scrolls is realized like never before.",
+      "first_release_date": "2011-11-10",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "cocs1l",
+      "igdb_url": "https://www.igdb.com/games/the-elder-scrolls-v-skyrim",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 9,
+          "name": "PlayStation 3"
+        },
+        {
+          "igdb_id": 12,
+          "name": "Xbox 360"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 12,
+          "name": "Role-playing (RPG)"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        },
+        {
+          "igdb_id": 23,
+          "name": "Stealth"
+        },
+        {
+          "igdb_id": 33,
+          "name": "Sandbox"
+        },
+        {
+          "igdb_id": 38,
+          "name": "Open world"
+        }
+      ]
+    },
+    {
+      "igdb_id": 880,
+      "name": "Resident Evil 2",
+      "slug": "resident-evil-2",
+      "summary": "Resident Evil 2 is a sequel to the first Resident Evil title. Like the previous game in the series, Resident Evil 2 is a 3D action-adventure using three-dimensional polygon characters over two-dimensional pre-rendered backgrounds, with the action viewed through a variety of cinematic fixed camera angles in each room. Players can choose to play as one of two possible characters; each goes through the same initial scenario but with differences in the type of weaponry they find and the people they meet along the way.",
+      "first_release_date": "1998-01-21",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "co2vz0",
+      "igdb_url": "https://www.igdb.com/games/resident-evil-2",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 7,
+          "name": "PlayStation"
+        },
+        {
+          "igdb_id": 9,
+          "name": "PlayStation 3"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Nintendo GameCube"
+        },
+        {
+          "igdb_id": 23,
+          "name": "Dreamcast"
+        },
+        {
+          "igdb_id": 38,
+          "name": "PlayStation Portable"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 5,
+          "name": "Shooter"
+        },
+        {
+          "igdb_id": 9,
+          "name": "Puzzle"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 18,
+          "name": "Science fiction"
+        },
+        {
+          "igdb_id": 19,
+          "name": "Horror"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Survival"
+        }
+      ]
+    },
+    {
+      "igdb_id": 1942,
+      "name": "The Witcher 3: Wild Hunt",
+      "slug": "the-witcher-3-wild-hunt",
+      "summary": "The Witcher 3: Wild Hunt is an open-world action role-playing game developed by CD Projekt Red.\n\nSet in a dark fantasy world, the game follows Geralt of Rivia, a monster hunter searching for his adopted daughter, Ciri, while navigating political conflicts and supernatural threats. Gameplay features exploration, combat, character progression, and branching narratives shaped by player choices. Widely acclaimed for its writing, world-building, and depth, it is considered one of the most influential RPGs of its generation.",
+      "first_release_date": "2015-05-19",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "coaarl",
+      "igdb_url": "https://www.igdb.com/games/the-witcher-3-wild-hunt",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        },
+        {
+          "igdb_id": 508,
+          "name": "Nintendo Switch 2"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 12,
+          "name": "Role-playing (RPG)"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        },
+        {
+          "igdb_id": 38,
+          "name": "Open world"
+        }
+      ]
+    },
+    {
+      "igdb_id": 3152,
+      "name": "Don't Starve",
+      "slug": "don-t-starve",
+      "summary": "Don’t Starve is an uncompromising wilderness survival game full of science and magic. Enter a strange and unexplored world full of strange creatures, dangers, and surprises. Gather resources to craft items and structures that match your survival style.",
+      "first_release_date": "2013-04-23",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "co1qqw",
+      "igdb_url": "https://www.igdb.com/games/don-t-starve",
+      "platforms": [
+        {
+          "igdb_id": 3,
+          "name": "Linux"
+        },
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 13,
+          "name": "Simulator"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        },
+        {
+          "igdb_id": 32,
+          "name": "Indie"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        },
+        {
+          "igdb_id": 19,
+          "name": "Horror"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Survival"
+        },
+        {
+          "igdb_id": 33,
+          "name": "Sandbox"
+        },
+        {
+          "igdb_id": 38,
+          "name": "Open world"
+        }
+      ]
+    },
+    {
+      "igdb_id": 4754,
+      "name": "Alien: Isolation",
+      "slug": "alien-isolation",
+      "summary": "Alien: Isolation is a survival horror game based on the Alien franchise. As Amanda Ripley, daughter of Ellen Ripley, you will navigate through an increasingly volatile world as you find yourself confronted on all sides by a panicked population and an unpredictable Alien. You must scavenge resources, improvise solutions and use your wits, not just to succeed in your mission but to simply stay alive. In addition to the main story mode there's Survivor mode in which the player needs to escape from a specially designed map fulfilling secondary objectives along the way, while being aggressively hunted by the alien. This mode includes online leaderboards.",
+      "first_release_date": "2014-10-06",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "co1vzu",
+      "igdb_url": "https://www.igdb.com/games/alien-isolation",
+      "platforms": [
+        {
+          "igdb_id": 3,
+          "name": "Linux"
+        },
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 9,
+          "name": "PlayStation 3"
+        },
+        {
+          "igdb_id": 12,
+          "name": "Xbox 360"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 18,
+          "name": "Science fiction"
+        },
+        {
+          "igdb_id": 19,
+          "name": "Horror"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Survival"
+        },
+        {
+          "igdb_id": 23,
+          "name": "Stealth"
+        }
+      ]
+    },
+    {
+      "igdb_id": 9254,
+      "name": "Subnautica",
+      "slug": "subnautica",
+      "summary": "Descend into the depths of an alien underwater world filled with wonder and peril. Craft equipment, pilot submarines and out-smart wildlife to explore lush coral reefs, volcanoes, cave systems, and more, all while trying to survive.",
+      "first_release_date": "2018-01-23",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "coa938",
+      "igdb_url": "https://www.igdb.com/games/subnautica",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 34,
+          "name": "Android"
+        },
+        {
+          "igdb_id": 39,
+          "name": "iOS"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 163,
+          "name": "SteamVR"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        },
+        {
+          "igdb_id": 385,
+          "name": "Oculus Rift"
+        },
+        {
+          "igdb_id": 508,
+          "name": "Nintendo Switch 2"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        },
+        {
+          "igdb_id": 32,
+          "name": "Indie"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 18,
+          "name": "Science fiction"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Survival"
+        },
+        {
+          "igdb_id": 38,
+          "name": "Open world"
+        }
+      ]
+    },
+    {
+      "igdb_id": 11133,
+      "name": "Dark Souls III",
+      "slug": "dark-souls-iii",
+      "summary": "Dark Souls III is an action role-playing game developed by FromSoftware and published by Bandai Namco Entertainment. Released in March 2016, it is the fourth entry in the Souls series and the final instalment in the Dark Souls trilogy. Set in the decaying kingdom of Lothric, players take on the role of the \"Ashen One,\" an undead warrior tasked with rekindling the First Flame to prevent the world from falling into darkness.\n\nThe game features challenging combat, intricate level design, and a deep, lore-rich narrative.",
+      "first_release_date": "2016-03-24",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "cob9ed",
+      "igdb_url": "https://www.igdb.com/games/dark-souls-iii",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 12,
+          "name": "Role-playing (RPG)"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        }
+      ]
+    },
+    {
+      "igdb_id": 11198,
+      "name": "Rocket League",
+      "slug": "rocket-league",
+      "summary": "Rocket League is a high-powered hybrid of arcade-style soccer and vehicular mayhem with easy-to-understand controls and fluid, physics-driven competition. Rocket League includes casual and competitive Online Matches, a fully-featured offline Season Mode, special “Mutators” that let you change the rules entirely, hockey and basketball-inspired Extra Modes, and more than 500 trillion possible cosmetic customization combinations.",
+      "first_release_date": "2015-07-06",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "cocyri",
+      "igdb_url": "https://www.igdb.com/games/rocket-league",
+      "platforms": [
+        {
+          "igdb_id": 3,
+          "name": "Linux"
+        },
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 10,
+          "name": "Racing"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Sport"
+        },
+        {
+          "igdb_id": 32,
+          "name": "Indie"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 18,
+          "name": "Science fiction"
+        }
+      ]
+    },
+    {
+      "igdb_id": 13166,
+      "name": "The Witcher 3: Wild Hunt - Blood and Wine",
+      "slug": "the-witcher-3-wild-hunt-blood-and-wine",
+      "summary": "Blood and Wine is the second major expansion to The Witcher 3: Wild Hunt.\n\nThe players will accompany Geralt of Rivia to the region of Toussaint, one of the few places in the Witcher universe which has remained largely untouched by the war. The calm, laid-back atmosphere holds a dark and bloody secret that only the White Wolf can uncover; the expansion features new items for players to collect on their adventure and introduces previously unknown characters.",
+      "first_release_date": "2016-05-30",
+      "game_category": 2,
+      "version_parent": null,
+      "cover_image_id": "co2lgo",
+      "igdb_url": "https://www.igdb.com/games/the-witcher-3-wild-hunt-blood-and-wine",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 12,
+          "name": "Role-playing (RPG)"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        },
+        {
+          "igdb_id": 38,
+          "name": "Open world"
+        }
+      ]
+    },
+    {
+      "igdb_id": 15553,
+      "name": "Alien: Isolation - Trauma",
+      "slug": "alien-isolation-trauma",
+      "summary": "Welcome to Trauma, the second add-on content pack for Alien: Isolation. This pack features three all-new maps for Survivor Mode, a time-based challenge to test your skills.\r\n\r\nFace off against a range of enemies across the medical bays of Sevastopol station. Will you evade, distract or confront them? You'll have to act fast if you want to survive.\r\n\r\n- Three new maps, including a claustrophobic scramble through the Sevastopol vents.\r\n- Play as Chief Medical Officer Lingard and get faster access to Medikits and distraction IEDs.\r\n- Destroy any trace of your research and save the survivors on the station.",
+      "first_release_date": "2014-12-02",
+      "game_category": 1,
+      "version_parent": null,
+      "cover_image_id": "co1yc7",
+      "igdb_url": "https://www.igdb.com/games/alien-isolation-trauma",
+      "platforms": [
+        {
+          "igdb_id": 3,
+          "name": "Linux"
+        },
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 9,
+          "name": "PlayStation 3"
+        },
+        {
+          "igdb_id": 12,
+          "name": "Xbox 360"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 18,
+          "name": "Science fiction"
+        },
+        {
+          "igdb_id": 19,
+          "name": "Horror"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Survival"
+        }
+      ]
+    },
+    {
+      "igdb_id": 17000,
+      "name": "Stardew Valley",
+      "slug": "stardew-valley",
+      "summary": "Stardew Valley is an open-ended country-life RPG! You’ve inherited your grandfather’s old farm plot in Stardew Valley. Armed with hand-me-down tools and a few coins, you set out to begin your new life. Can you learn to live off the land and turn these overgrown fields into a thriving home? It won’t be easy. Ever since Joja Corporation came to town, the old ways of life have all but disappeared. The community center, once the town’s most vibrant hub of activity, now lies in shambles. But the valley seems full of opportunity. With a little dedication, you might just be the one to restore Stardew Valley to greatness!",
+      "first_release_date": "2016-02-26",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "coa93h",
+      "igdb_url": "https://www.igdb.com/games/stardew-valley",
+      "platforms": [
+        {
+          "igdb_id": 3,
+          "name": "Linux"
+        },
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 34,
+          "name": "Android"
+        },
+        {
+          "igdb_id": 39,
+          "name": "iOS"
+        },
+        {
+          "igdb_id": 41,
+          "name": "Wii U"
+        },
+        {
+          "igdb_id": 46,
+          "name": "PlayStation Vita"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 508,
+          "name": "Nintendo Switch 2"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 12,
+          "name": "Role-playing (RPG)"
+        },
+        {
+          "igdb_id": 13,
+          "name": "Simulator"
+        },
+        {
+          "igdb_id": 15,
+          "name": "Strategy"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        },
+        {
+          "igdb_id": 32,
+          "name": "Indie"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        },
+        {
+          "igdb_id": 28,
+          "name": "Business"
+        },
+        {
+          "igdb_id": 33,
+          "name": "Sandbox"
+        },
+        {
+          "igdb_id": 44,
+          "name": "Romance"
+        }
+      ]
+    },
+    {
+      "igdb_id": 19686,
+      "name": "Resident Evil 2",
+      "slug": "resident-evil-2--1",
+      "summary": "Resident Evil 2 is a remake of 1998's Resident Evil 2. The game was not developed with the intent of improving the original, but rather a reimagining of the original story with redesigned maps, characters and story elements. Gameplay mechanics are more similar to Resident Evil 7: Biohazard though with the use of an over-the-shoulder camera.",
+      "first_release_date": "2019-01-25",
+      "game_category": 8,
+      "version_parent": null,
+      "cover_image_id": "co1ir3",
+      "igdb_url": "https://www.igdb.com/games/resident-evil-2--1",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 39,
+          "name": "iOS"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        },
+        {
+          "igdb_id": 508,
+          "name": "Nintendo Switch 2"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 5,
+          "name": "Shooter"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 19,
+          "name": "Horror"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Survival"
+        }
+      ]
+    },
+    {
+      "igdb_id": 26226,
+      "name": "Celeste",
+      "slug": "celeste",
+      "summary": "Help Madeline survive her inner demons on her journey to the top of Celeste Mountain, in this super-tight platformer from the creators of TowerFall. Brave hundreds of hand-crafted challenges, uncover devious secrets, and piece together the mystery of the mountain.",
+      "first_release_date": "2018-01-25",
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "cob9dh",
+      "igdb_url": "https://www.igdb.com/games/celeste",
+      "platforms": [
+        {
+          "igdb_id": 3,
+          "name": "Linux"
+        },
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 170,
+          "name": "Google Stadia"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 8,
+          "name": "Platform"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        },
+        {
+          "igdb_id": 32,
+          "name": "Indie"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        }
+      ]
+    },
+    {
+      "igdb_id": 26764,
+      "name": "Mario Kart 8 Deluxe",
+      "slug": "mario-kart-8-deluxe",
+      "summary": "Hit the road with the definitive version of Mario Kart 8 and play anytime, anywhere! Race your friends or battle them in a revised battle mode on new and returning battle courses. Play locally in up to 4-player multiplayer in 1080p while playing in TV Mode. Every track from the Wii U version, including DLC, makes a glorious return. Plus, the Inklings appear as all-new guest characters, along with returning favorites, such as King Boo, Dry Bones, and Bowser Jr.!",
+      "first_release_date": "2017-04-28",
+      "game_category": 10,
+      "version_parent": null,
+      "cover_image_id": "co213p",
+      "igdb_url": "https://www.igdb.com/games/mario-kart-8-deluxe",
+      "platforms": [
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 508,
+          "name": "Nintendo Switch 2"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 10,
+          "name": "Racing"
+        },
+        {
+          "igdb_id": 33,
+          "name": "Arcade"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        },
+        {
+          "igdb_id": 35,
+          "name": "Kids"
+        },
+        {
+          "igdb_id": 40,
+          "name": "Party"
+        }
+      ]
+    },
+    {
+      "igdb_id": 26916,
+      "name": "Dark Souls III: The Ringed City",
+      "slug": "dark-souls-iii-the-ringed-city",
+      "summary": "Dark Souls III: The Ringed City is the second DLC expansion for Dark Souls III, released in March 2017. It introduces the Ringed City, a new area at the world's edge where the Age of Fire is ending. The expansion includes new environments, enemies, bosses, and items like weapons, armour, and spells. The content further explores the game's lore, focusing on the themes of decay and the cyclical nature of the world.",
+      "first_release_date": "2017-03-27",
+      "game_category": 2,
+      "version_parent": null,
+      "cover_image_id": "co28fq",
+      "igdb_url": "https://www.igdb.com/games/dark-souls-iii-the-ringed-city",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 12,
+          "name": "Role-playing (RPG)"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        }
+      ]
+    },
+    {
+      "igdb_id": 81085,
+      "name": "Dark Souls: Remastered",
+      "slug": "dark-souls-remastered",
+      "summary": "Dark Souls Remastered is a remastered version of the original game Dark Souls. The updated version of the game features graphical enhancements, an expanded online mode, and the Artorias of the Abyss DLC.",
+      "first_release_date": "2018-05-23",
+      "game_category": 9,
+      "version_parent": null,
+      "cover_image_id": "cobazz",
+      "igdb_url": "https://www.igdb.com/games/dark-souls-remastered",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 12,
+          "name": "Role-playing (RPG)"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        }
+      ]
+    },
+    {
+      "igdb_id": 107315,
+      "name": "Subnautica: Below Zero",
+      "slug": "subnautica-below-zero",
+      "summary": "Dive into a freezing underwater adventure on an alien planet. Below Zero is set two years after the original Subnautica. Return to Planet 4546B to uncover the truth behind a deadly cover-up. Survive by building habitats, crafting tools, & diving deeper into the world of Subnautica.",
+      "first_release_date": "2021-05-13",
+      "game_category": 4,
+      "version_parent": null,
+      "cover_image_id": "co39ve",
+      "igdb_url": "https://www.igdb.com/games/subnautica-below-zero",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        },
+        {
+          "igdb_id": 508,
+          "name": "Nintendo Switch 2"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        },
+        {
+          "igdb_id": 32,
+          "name": "Indie"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 18,
+          "name": "Science fiction"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Survival"
+        },
+        {
+          "igdb_id": 38,
+          "name": "Open world"
+        }
+      ]
+    },
+    {
+      "igdb_id": 114283,
+      "name": "Persona 5 Royal",
+      "slug": "persona-5-royal",
+      "summary": "Persona 5 Royal is an enhanced version of the turn-based role-playing game Persona 5, set in modern-day Tokyo. Players control a high school student who leads a group of secret vigilantes called the Phantom Thieves of Hearts, exploring supernatural dungeons called Palaces to change the hearts of corrupt adults. The game combines dungeon crawling and turn-based combat with social simulation elements, where players manage daily activities, build relationships, and develop character statistics across a school year. Royal adds new characters, a third semester, an additional Palace, new music, and expanded story content to the original game.",
+      "first_release_date": "2019-10-31",
+      "game_category": 10,
+      "version_parent": null,
+      "cover_image_id": "coclf1",
+      "igdb_url": "https://www.igdb.com/games/persona-5-royal",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 12,
+          "name": "Role-playing (RPG)"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        },
+        {
+          "igdb_id": 27,
+          "name": "Comedy"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Drama"
+        },
+        {
+          "igdb_id": 43,
+          "name": "Mystery"
+        }
+      ]
+    },
+    {
+      "igdb_id": 132181,
+      "name": "Resident Evil 4",
+      "slug": "resident-evil-4--1",
+      "summary": "Resident Evil 4 is a remake of the 2005 original Resident Evil 4 reimagined for 2023 to bring state-of-the-art survival horror. Resident Evil 4 preserves the essence of the original game, while introducing modernized gameplay, a reimagined storyline,\nand vividly detailed graphics to make this the latest survival horror game where life and death, terror and catharsis intersect.",
+      "first_release_date": "2023-03-24",
+      "game_category": 8,
+      "version_parent": null,
+      "cover_image_id": "co6bo0",
+      "igdb_url": "https://www.igdb.com/games/resident-evil-4--1",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 39,
+          "name": "iOS"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        },
+        {
+          "igdb_id": 508,
+          "name": "Nintendo Switch 2"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 5,
+          "name": "Shooter"
+        },
+        {
+          "igdb_id": 9,
+          "name": "Puzzle"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 19,
+          "name": "Horror"
+        },
+        {
+          "igdb_id": 43,
+          "name": "Mystery"
+        }
+      ]
+    },
+    {
+      "igdb_id": 134581,
+      "name": "Marvel's Spider-Man: Miles Morales",
+      "slug": "marvels-spider-man-miles-morales",
+      "summary": "Marvel's Spider-Man: Miles Morales is a third-person action-adventure game and a standalone continuation of Marvel's Spider-Man (2018). Set in an open-world version of New York City during winter, the game follows Miles Morales as he takes on the role of Spider-Man while Peter Parker is abroad. Gameplay focuses on traversal, combat, and completing missions across the city. Miles has unique abilities distinct from Peter, including bio-electric \"Venom\" attacks and temporary invisibility. The game features unlockable suits, gadgets, and a skill tree progression system.",
+      "first_release_date": "2020-11-12",
+      "game_category": 4,
+      "version_parent": null,
+      "cover_image_id": "cobg1j",
+      "igdb_url": "https://www.igdb.com/games/marvels-spider-man-miles-morales",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 25,
+          "name": "Hack and slash/Beat 'em up"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 23,
+          "name": "Stealth"
+        },
+        {
+          "igdb_id": 38,
+          "name": "Open world"
+        }
+      ]
+    },
+    {
+      "igdb_id": 159119,
+      "name": "Dead Space",
+      "slug": "dead-space--1",
+      "summary": "The sci-fi survival-horror classic Dead Space returns, completely rebuilt from the ground up to offer a deeper, more immersive experience. This remake brings jaw-dropping visual fidelity, suspenseful atmospheric audio, and improvements to gameplay while staying faithful to the original game’s thrilling vision.",
+      "first_release_date": "2023-01-27",
+      "game_category": 8,
+      "version_parent": null,
+      "cover_image_id": "cobkv5",
+      "igdb_url": "https://www.igdb.com/games/dead-space--1",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 5,
+          "name": "Shooter"
+        },
+        {
+          "igdb_id": 12,
+          "name": "Role-playing (RPG)"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 18,
+          "name": "Science fiction"
+        },
+        {
+          "igdb_id": 19,
+          "name": "Horror"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Survival"
+        }
+      ]
+    },
+    {
+      "igdb_id": 165192,
+      "name": "The Elder Scrolls V: Skyrim - Anniversary Edition",
+      "slug": "the-elder-scrolls-v-skyrim-anniversary-edition",
+      "summary": "The Elder Scrolls V: Skyrim - Anniversary Edition contains the full game plus all three expansions and over 500 pieces of unique content from Creation Club, including pre-existing and new quests, dungeons, bosses, weapons, spells and more!",
+      "first_release_date": "2021-11-11",
+      "game_category": 10,
+      "version_parent": null,
+      "cover_image_id": "coa9tq",
+      "igdb_url": "https://www.igdb.com/games/the-elder-scrolls-v-skyrim-anniversary-edition",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        },
+        {
+          "igdb_id": 508,
+          "name": "Nintendo Switch 2"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 12,
+          "name": "Role-playing (RPG)"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 17,
+          "name": "Fantasy"
+        },
+        {
+          "igdb_id": 38,
+          "name": "Open world"
+        }
+      ]
+    },
+    {
+      "igdb_id": 180496,
+      "name": "Scuffed Rocket League",
+      "slug": "scuffed-rocket-league",
+      "summary": "This fan made game of Rocket League is kinda scuffed.",
+      "first_release_date": null,
+      "game_category": 0,
+      "version_parent": null,
+      "cover_image_id": "",
+      "igdb_url": "https://www.igdb.com/games/scuffed-rocket-league",
+      "platforms": [],
+      "genres": [
+        {
+          "igdb_id": 14,
+          "name": "Sport"
+        }
+      ],
+      "themes": []
+    },
+    {
+      "igdb_id": 204462,
+      "name": "Rocket League: Season 7",
+      "slug": "rocket-league-season-7",
+      "summary": "Welcome, esteemed Rocketeers! Season 7 features luxurious rewards like the Maestro Car and golden painted pro tier items. Rank up in the Utopia Coliseum (Gilded) Arena, or compete for tournament rewards.",
+      "first_release_date": "2022-06-15",
+      "game_category": 7,
+      "version_parent": null,
+      "cover_image_id": "co4ut4",
+      "igdb_url": "https://www.igdb.com/games/rocket-league-season-7",
+      "platforms": [
+        {
+          "igdb_id": 3,
+          "name": "Linux"
+        },
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Mac"
+        },
+        {
+          "igdb_id": 48,
+          "name": "PlayStation 4"
+        },
+        {
+          "igdb_id": 49,
+          "name": "Xbox One"
+        },
+        {
+          "igdb_id": 130,
+          "name": "Nintendo Switch"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 10,
+          "name": "Racing"
+        },
+        {
+          "igdb_id": 14,
+          "name": "Sport"
+        },
+        {
+          "igdb_id": 32,
+          "name": "Indie"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 40,
+          "name": "Party"
+        }
+      ]
+    },
+    {
+      "igdb_id": 222341,
+      "name": "Silent Hill 2",
+      "slug": "silent-hill-2--1",
+      "summary": "Silent Hill 2 Remake is a ground-up reimagining of the 2001 psychological horror game. It follows James Sunderland as he searches for his deceased wife in the fog-shrouded town of Silent Hill. The remake features entirely rebuilt visuals in Unreal Engine 5, over-the-shoulder gameplay, reworked combat, and new voice acting.",
+      "first_release_date": "2024-10-08",
+      "game_category": 8,
+      "version_parent": null,
+      "cover_image_id": "coavaf",
+      "igdb_url": "https://www.igdb.com/games/silent-hill-2--1",
+      "platforms": [
+        {
+          "igdb_id": 6,
+          "name": "PC (Microsoft Windows)"
+        },
+        {
+          "igdb_id": 167,
+          "name": "PlayStation 5"
+        },
+        {
+          "igdb_id": 169,
+          "name": "Xbox Series X|S"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 9,
+          "name": "Puzzle"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 19,
+          "name": "Horror"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Survival"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Drama"
+        },
+        {
+          "igdb_id": 43,
+          "name": "Mystery"
+        }
+      ]
+    },
+    {
+      "igdb_id": 287844,
+      "name": "Resident Evil 2",
+      "slug": "resident-evil-2--5",
+      "summary": "The Nintendo 64 port of Resident Evil 2 was a very faithful port, with most of the changes being related to the overall cutscene quality, due to storage constraints, and the EX-Files.",
+      "first_release_date": "1999-11-16",
+      "game_category": 11,
+      "version_parent": null,
+      "cover_image_id": "co7tap",
+      "igdb_url": "https://www.igdb.com/games/resident-evil-2--5",
+      "platforms": [
+        {
+          "igdb_id": 4,
+          "name": "Nintendo 64"
+        }
+      ],
+      "genres": [
+        {
+          "igdb_id": 5,
+          "name": "Shooter"
+        },
+        {
+          "igdb_id": 31,
+          "name": "Adventure"
+        }
+      ],
+      "themes": [
+        {
+          "igdb_id": 1,
+          "name": "Action"
+        },
+        {
+          "igdb_id": 19,
+          "name": "Horror"
+        },
+        {
+          "igdb_id": 21,
+          "name": "Survival"
+        }
+      ]
+    }
+  ],
+  "users": {
+    "demo_a": [
+      {
+        "igdb_id": 880,
+        "added": "2026-11-10T20:15:00Z",
+        "status": "playing",
+        "platform_played": "PlayStation",
+        "hours_played": "6.5",
+        "start_date": "2026-11-08",
+        "notes": "Leon A done. Licker in the police station hallway still gets me."
+      },
+      {
+        "igdb_id": 19686,
+        "added": "2026-08-02T18:00:00Z",
+        "status": "completed",
+        "favorite": true,
+        "rating": 9,
+        "platform_played": "PlayStation 4",
+        "start_date": "2026-07-20",
+        "finish_date": "2026-08-01",
+        "hours_played": "14.0",
+        "notes": "Mr. X stalking sections were the highlight."
+      },
+      {
+        "igdb_id": 287844,
+        "added": "2026-11-12T09:30:00Z",
+        "notes": "Curious how they fit it on one cartridge."
+      },
+      {
+        "igdb_id": 132181,
+        "added": "2026-06-15T21:00:00Z",
+        "status": "completed",
+        "favorite": true,
+        "rating": 10,
+        "platform_played": "PlayStation 5",
+        "start_date": "2026-06-01",
+        "finish_date": "2026-06-14",
+        "hours_played": "22.5"
+      },
+      {
+        "igdb_id": 222341,
+        "added": "2026-10-28T22:10:00Z",
+        "status": "playing",
+        "platform_played": "PC (Microsoft Windows)",
+        "start_date": "2026-10-25",
+        "hours_played": "5.0",
+        "notes": "Foggy streets, radio static."
+      },
+      {
+        "igdb_id": 159119,
+        "added": "2026-09-05T19:45:00Z",
+        "status": "on_hold",
+        "platform_played": "Xbox Series X|S",
+        "start_date": "2026-09-06",
+        "hours_played": "3.0",
+        "notes": "Paused after chapter 3."
+      },
+      {
+        "igdb_id": 4754,
+        "added": "2026-04-11T23:00:00Z",
+        "status": "dropped",
+        "rating": 6,
+        "platform_played": "PC (Microsoft Windows)",
+        "start_date": "2026-04-12",
+        "hours_played": "4.5",
+        "notes": "Too tense for me right now."
+      },
+      {
+        "igdb_id": 15553,
+        "added": "2026-04-11T23:05:00Z"
+      },
+      {
+        "igdb_id": 9254,
+        "added": "2026-03-01T17:20:00Z",
+        "status": "completed",
+        "rating": 8,
+        "platform_played": "PC (Microsoft Windows)",
+        "start_date": "2026-02-10",
+        "finish_date": "2026-02-28",
+        "hours_played": "31.0"
+      },
+      {
+        "igdb_id": 107315,
+        "added": "2026-03-02T10:00:00Z"
+      },
+      {
+        "igdb_id": 3152,
+        "added": "2026-07-04T15:30:00Z",
+        "status": "on_hold",
+        "platform_played": "Nintendo Switch",
+        "hours_played": "9.0"
+      },
+      {
+        "igdb_id": 11133,
+        "added": "2026-05-20T20:00:00Z",
+        "status": "completed",
+        "favorite": true,
+        "rating": 9,
+        "platform_played": "PlayStation 4",
+        "start_date": "2026-05-01",
+        "finish_date": "2026-05-19",
+        "hours_played": "48.0"
+      },
+      {
+        "igdb_id": 26916,
+        "added": "2026-05-20T20:05:00Z"
+      },
+      {
+        "igdb_id": 81085,
+        "added": "2026-10-01T12:00:00Z",
+        "status": "playing",
+        "platform_played": "Nintendo Switch",
+        "start_date": "2026-10-02",
+        "hours_played": "12.0"
+      },
+      {
+        "igdb_id": 1942,
+        "added": "2026-01-15T19:00:00Z",
+        "status": "completed",
+        "rating": 10,
+        "platform_played": "PC (Microsoft Windows)",
+        "start_date": "2025-12-01",
+        "finish_date": "2026-01-14",
+        "hours_played": "110.0"
+      }
+    ],
+    "demo_b": [
+      {
+        "igdb_id": 1942,
+        "added": "2026-11-11T21:00:00Z",
+        "status": "playing",
+        "platform_played": "Nintendo Switch",
+        "start_date": "2026-11-01",
+        "hours_played": "18.0",
+        "notes": "Gwent tournament in Novigrad."
+      },
+      {
+        "igdb_id": 13166,
+        "added": "2026-11-11T21:05:00Z"
+      },
+      {
+        "igdb_id": 472,
+        "added": "2026-02-14T18:30:00Z",
+        "status": "completed",
+        "favorite": true,
+        "rating": 9,
+        "platform_played": "Nintendo Switch",
+        "hours_played": "140.0",
+        "notes": "Platform kept from before a refresh removed it."
+      },
+      {
+        "igdb_id": 165192,
+        "added": "2026-09-09T20:00:00Z"
+      },
+      {
+        "igdb_id": 114283,
+        "added": "2026-07-22T22:00:00Z",
+        "status": "completed",
+        "favorite": true,
+        "rating": 10,
+        "platform_played": "PlayStation 5",
+        "start_date": "2026-05-01",
+        "finish_date": "2026-07-20",
+        "hours_played": "104.5"
+      },
+      {
+        "igdb_id": 26764,
+        "added": "2026-03-18T16:00:00Z",
+        "status": "playing",
+        "platform_played": "Nintendo Switch",
+        "hours_played": "40.0"
+      },
+      {
+        "igdb_id": 17000,
+        "added": "2026-01-05T10:00:00Z",
+        "status": "on_hold",
+        "platform_played": "PC (Microsoft Windows)",
+        "hours_played": "60.0",
+        "notes": "Year 2, spring."
+      },
+      {
+        "igdb_id": 26226,
+        "added": "2026-06-01T09:00:00Z",
+        "status": "completed",
+        "rating": 9,
+        "platform_played": "PC (Microsoft Windows)",
+        "start_date": "2026-05-20",
+        "finish_date": "2026-05-31",
+        "hours_played": "11.0"
+      },
+      {
+        "igdb_id": 72,
+        "added": "2026-04-04T14:00:00Z",
+        "status": "completed",
+        "rating": 9,
+        "platform_played": "PlayStation 3",
+        "finish_date": "2026-04-10"
+      },
+      {
+        "igdb_id": 134581,
+        "added": "2026-10-14T19:30:00Z",
+        "status": "dropped",
+        "rating": 6,
+        "platform_played": "PlayStation 5",
+        "hours_played": "2.0"
+      },
+      {
+        "igdb_id": 11198,
+        "added": "2026-08-08T18:00:00Z",
+        "status": "playing",
+        "platform_played": "PC (Microsoft Windows)",
+        "hours_played": "75.0"
+      },
+      {
+        "igdb_id": 204462,
+        "added": "2026-08-08T18:05:00Z"
+      },
+      {
+        "igdb_id": 180496,
+        "added": "2026-10-30T11:00:00Z",
+        "notes": "No cover art on IGDB for this one."
+      }
+    ]
+  }
+}

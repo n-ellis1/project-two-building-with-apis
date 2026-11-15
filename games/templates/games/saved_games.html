@@ -2,11 +2,48 @@
 {% block title %}My Saved Games{% endblock %}
 {% block content %}
 <h1 class="h3 mb-4">My Saved Games</h1>
-<div class="card shadow-sm">
-  <div class="card-body text-center py-5">
-    <p class="lead mb-2">You haven't saved any games yet.</p>
-    <p class="text-body-secondary mb-3">Search IGDB to find a game and add it to your list.</p>
-    <a class="btn btn-primary" href="{% url 'games:search' %}">Search IGDB</a>
+{% if page_obj.paginator.count %}
+  <p class="text-body-secondary small mb-2" data-testid="result-summary">
+    Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+    · sorted by Date Added (Newest First)
+  </p>
+  <ul class="list-group shadow-sm mb-3" data-testid="entry-list">
+    {% for entry in page_obj %}
+      <li class="list-group-item py-3" data-testid="entry-row">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+          <span class="fw-semibold">{{ entry.game.name }}</span>
+          {% if entry.game.category_badge %}
+            <span class="badge text-bg-info" data-testid="category-badge">{{ entry.game.category_badge }}</span>
+          {% endif %}
+          {% if entry.favorite %}
+            <span class="badge text-bg-warning" data-testid="favorite-badge">★ Favorite</span>
+          {% endif %}
+        </div>
+        <div class="small text-body-secondary">
+          <span class="badge text-bg-secondary me-1">{{ entry.get_status_display }}</span>
+          {% for platform in entry.game.platforms.all %}{{ platform.name }}{% if not forloop.last %}, {% endif %}{% empty %}Platforms unknown{% endfor %}
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+  {% if page_obj.has_other_pages %}
+    <nav aria-label="Saved games pages" class="d-flex align-items-center gap-3">
+      {% if page_obj.has_previous %}
+        <a class="btn btn-outline-primary btn-sm" href="?page={{ page_obj.previous_page_number }}" rel="prev">Previous</a>
+      {% endif %}
+      <span class="small text-body-secondary" data-testid="page-label">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a class="btn btn-outline-primary btn-sm" href="?page={{ page_obj.next_page_number }}" rel="next">Next</a>
+      {% endif %}
+    </nav>
+  {% endif %}
+{% else %}
+  <div class="card shadow-sm">
+    <div class="card-body text-center py-5">
+      <p class="lead mb-2">You haven't saved any games yet.</p>
+      <p class="text-body-secondary mb-3">Search IGDB to find a game and add it to your list.</p>
+      <a class="btn btn-primary" href="{% url 'games:search' %}">Search IGDB</a>
+    </div>
   </div>
-</div>
+{% endif %}
 {% endblock %}

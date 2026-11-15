@@ -28,6 +28,32 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Phase 3: models, admin, demo seed and the basic My Saved Games list
+
+### Prompts
+1. `/implement` Read CLAUDE.md, prd/video-game-tracker.md, and plans/video-game-tracker.md. Implement Phase 3 only: the models, admin, demo seed command, and basic My Saved Games list with 10 entries per page.
+
+   Follow the approved plan and the test-first workflow. Make the demo seed safe to rerun without overwriting existing accounts or entries. Verify that each user sees only their own saved games.
+
+   Run the planned automated checks and give me the exact PowerShell commands and browser steps to verify the phase. Pause for my manual verification before marking Phase 3 complete, staging, committing, pushing, or starting Phase 4.
+2. I approve all three TDD candidates and the Phase 3 design. Run each test first and confirm it fails for the expected reason before implementing the behavior.
+
+   Before naming the password variable, check the approved PRD and plan and use the agreed name consistently in the command, .env.example, tests, and README. If an existing demo username belongs to an account the seeder can't identify as its own, stop with a clear message before making any changes. Add a test that verifies the account and its entries are untouched. Rerunning against previously seeded demo accounts should preserve their passwords and entries.
+
+   Keep live IGDB requests limited to preparing the fixture. The seed command and automated tests should work offline. Confirm that demo A can reach page 2 with 10 entries per page, and that demo B cannot see A's entries even when requesting another page.
+
+   When Phase 3 is built, run the planned checks and give me the exact PowerShell commands and browser steps for verification. Stop for my manual review before marking the phase complete, staging, committing, pushing, or starting Phase 4.
+3. I finished the Phase 3 manual checks. The seed created the expected users, games, and entries, and a rerun created nothing. Both demo accounts showed only their own saved entries, pagination and invalid page values behaved as expected, and the Game Category badges displayed correctly. Changing demo_a's password survived a seed rerun, and the missing-password check stopped without creating anything. In admin, imported metadata was read-only and Entry tracking fields were editable.
+
+   Record these results in docs/verification.md, append the Phase 3 session log to PROMPTS.md, and mark Phase 3 complete in plans/video-game-tracker.md. Use DEMO_PASSWORD consistently in the documentation and keep all password values and credentials out of the log.
+
+   Run the five standard checks again. Show me the results, git status --short, and the planned commit message. Pause before staging, committing, pushing, or starting Phase 4.
+
+### Summary
+- **Outcome:** Built `Game`, `Platform`, `Genre`, `Theme` and `Entry` (unique owner and game; database checks for rating 1–10 and hours of 0 or more; `PROTECT` so deleting an entry never deletes a Game), plus a `DemoAccount` marker model. Admin keeps IGDB data view-only and makes Entry tracking fields editable. `games/queries.py` holds the owner-scoped helpers and `parse_page`. My Saved Games lists 10 per page, newest first, with title and entry-ID tie-breakers, badges on non-main games only, Previous/Next and an empty state. `seed_demo` loads `games/demo_data/seed.json` (27 real IGDB records gathered once by a scratchpad script, with made-up entries): `demo_a` has 15 entries with Horror and Survival, `demo_b` has 13 without them. Both use `DEMO_PASSWORD`. The three approved TDD behaviors (page helper, seed rerun safety, B never sees A's entries) each failed on assertions before the code was written. The five standard checks pass with 63 tests, and the user's manual verification passed.
+- **Deviations:** The PRD and plan only say "demo password", so `DEMO_PASSWORD` was chosen and used in the command, `.env.example`, tests, README, CLAUDE.md and the plan. The user added requirements beyond the plan in prompt 2: stop untouched when a demo username belongs to an account the seeder didn't create (solved with the `DemoAccount` marker), and check demo A's page 2 and demo B's isolation on other pages with the real seed. The seed also includes a stale-platform entry and a game with no cover for later phases. After prompt 2 approved the behaviors, the TDD cycles ran straight through without the skill's pause after each RED and GREEN. The RED evidence was reported at the end.
+- **Sideways:** The first RED run of the seed tests included errors rather than assertion failures (`User.DoesNotExist`, and an invalid datetime literal in one test's own setup). Those were repaired mechanically without changing what the tests assert, and the rerun failed on assertions only. A Bash `python` call failed because only the uv-managed Python is installed, so the scratch scripts ran with `uv run`. A test docstring needed two edits to fit Ruff's line length. No credentials or password values were printed, logged or written to files.
+
 ## 2026-11-14 — Phase 2: Django project skeleton, accounts, Bootstrap layout and verification record
 
 ### Prompts

@@ -14,6 +14,19 @@ From the repo root in PowerShell, after `uv sync` and creating `.env` from `.env
 
 Optional: `uv run python manage.py createsuperuser` for `/admin/`. Full setup docs are completed in Phase 12.
 
+### Demo data
+
+`seed_demo` creates two demo accounts, `demo_a` and `demo_b`, with different saved games, from data stored in `games/demo_data/seed.json` (real IGDB records, so it works offline and never contacts IGDB). `demo_a` has Horror and Survival games and more than one page of entries. `demo_b` has neither theme.
+
+1. Add a password for the demo accounts to `.env`: `DEMO_PASSWORD=<a password of your choice>`. If it's missing, the command stops with a message and creates nothing.
+2. Run the command, then sign in as `demo_a` or `demo_b` with that password:
+
+   ```powershell
+   uv run python manage.py seed_demo
+   ```
+
+It's safe to rerun. It only adds what's missing. Existing demo accounts keep their passwords (even if `DEMO_PASSWORD` changes), and existing games and entries are never changed. If `demo_a` or `demo_b` already belongs to an account the command didn't create, it stops without changing anything.
+
 ## IGDB verification script
 
 `scripts/igdb_search.py` searches [IGDB](https://www.igdb.com) for games by title and prints each match's title, IGDB ID, release date (UTC) and platforms, up to 10 results per page. It confirms that real API requests work before the Django game tracker is designed. Background research is in [docs/research/game-api-comparison.md](docs/research/game-api-comparison.md).

@@ -213,13 +213,15 @@ The owner-scoped entry helper. My Saved Games lists the user's entries with titl
 
 ### Acceptance criteria
 
-- [ ] The unique (owner, game) constraint rejects a second entry for the same user and game. Deleting an entry keeps the Game.
-- [ ] New entries default to Want to Play and not favorite. Hours below 0 and ratings outside 1–10 are rejected at model level.
-- [ ] Running the seed command twice gives the same rows. Changing a demo user's password and rerunning doesn't reset it. A missing password variable stops with a clear message and creates nothing.
-- [ ] Demo user B's list never contains A's entries.
-- [ ] The page helper returns 1 for `None`, `''`, `abc`, `2.5`, `0` and `-1`, the requested page for `2`, and the last page for `99` (prototype verification table).
-- [ ] Badges appear only on non-main games.
-- [ ] The admin shows imported data read-only and entry tracking fields editable.
+- [x] The unique (owner, game) constraint rejects a second entry for the same user and game. Deleting an entry keeps the Game.
+- [x] New entries default to Want to Play and not favorite. Hours below 0 and ratings outside 1–10 are rejected at model level.
+- [x] Running the seed command twice gives the same rows. Changing a demo user's password and rerunning doesn't reset it. A missing password variable stops with a clear message and creates nothing.
+- [x] Demo user B's list never contains A's entries.
+- [x] The page helper returns 1 for `None`, `''`, `abc`, `2.5`, `0` and `-1`, the requested page for `2`, and the last page for `99` (prototype verification table).
+- [x] Badges appear only on non-main games.
+- [x] The admin shows imported data read-only and entry tracking fields editable.
+
+**Result (2026-11-15):** all standard checks pass (63 tests), and the manual steps passed (see [docs/verification.md](../docs/verification.md)). The demo password variable is `DEMO_PASSWORD` (the PRD and plan didn't name it). The command is `seed_demo`, the demo users are `demo_a` and `demo_b`, and the fixture is `games/demo_data/seed.json`. A `DemoAccount` marker model was added, so the seed stops without changes if a demo username belongs to an account it didn't create. Shared helpers are in `games/queries.py`.
 
 ### Automated checks
 
@@ -227,7 +229,7 @@ Standard checks, plus model/constraint tests, seed command tests (idempotent, ne
 
 ### Manual verification (browser)
 
-1. Add the demo password to `.env`, run the seed command twice, and confirm the output reports nothing duplicated.
+1. Add the demo password (`DEMO_PASSWORD`) to `.env`, run the seed command twice, and confirm the output reports nothing duplicated.
 2. Sign in as demo user A: 10 entries on page 1, Next goes to page 2, badges show on expansions/remakes.
 3. Try `/games/?page=0`, `?page=abc` and `?page=-1` (page 1), then `?page=99` (last page).
 4. Sign in as demo user B: none of A's games appear.
@@ -701,7 +703,7 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Phase 1: Verify IGDB game types (live verification and documentation checkpoint)
 - [x] Initial root `CLAUDE.md` (before the first `/implement` phase; commit `f0750a4`)
 - [x] Phase 2: Project skeleton, accounts and site layout
-- [ ] Phase 3: Models, admin, demo seed and basic My Saved Games
+- [x] Phase 3: Models, admin, demo seed and basic My Saved Games
 - [ ] Phase 4: Entry detail page and covers
 - [ ] Phase 5: Edit and delete entries
 - [ ] Phase 6: Search, filters, Theme, sorts and pagination
