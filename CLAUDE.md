@@ -54,6 +54,8 @@ uv run python manage.py seed_demo                # creates demo_a and demo_b fro
 ## Conventions
 
 - **Layout:** one project package, `config` (settings, root URLs), and one app, `games`, which holds models, views, API, IGDB client, save service, templates (`games/templates/games/`, auth pages in `games/templates/registration/`), static files and tests (`games/tests/`). Bootstrap 5.3.8 is vendored in `games/static/games/vendor/bootstrap-5.3.8/` (see its `SOURCE.md`). Every page extends `games/base.html`. The owner-scoped helpers (`owned_entries`, `get_owned_entry_or_404`), `parse_page` and `PAGE_SIZE` live in `games/queries.py`. Test data helpers are in `games/tests/factories.py`.
+- **Covers:** `games/covers.py` is the one cover URL builder (`cover_url`, sizes, dimensions, placeholder path). Templates render covers only with `{% load game_covers %}{% cover_img game "small" %}` (or `"large"` on detail), which outputs a fixed-size, lazy `<img>`. Remote covers carry `data-cover-placeholder`; `games/static/games/js/cover-fallback.js` (deferred in `base.html`) swaps a failed one to `games/img/cover-placeholder.svg` once. The script has no automated test (no JS engine); the blocked-`images.igdb.com` browser check covers it. Covers are hotlinked, never downloaded.
+- **Detail return link:** list rows link to `/games/<id>/?page=N` (page 2 on), and the detail page's My Saved Games link is rebuilt from the route and `parse_page`. Phase 6 extends it to search, filters and sort.
 - **Demo seed:** `seed_demo` loads `games/demo_data/seed.json` (real IGDB records gathered once, entries made up). It only touches accounts marked with a `DemoAccount` row, and stops before any change if `demo_a` or `demo_b` belongs to another account. It never resets passwords or changes existing Games or entries. To regenerate the fixture, use a throwaway scratchpad script (never commit it).
 - **Routes:**
   - `/games/` My Saved Games; `/games/<id>/` plus `edit/`, `delete/` and `refresh/`, where `<id>` is the **Entry** ID
@@ -80,7 +82,7 @@ uv run python manage.py seed_demo                # creates demo_a and demo_b fro
 
 ## Per-phase workflow
 
-Work on one phase at a time (`/implement` with the PRD and plan). Phases 1 to 3 are done.
+Work on one phase at a time (`/implement` with the PRD and plan). Phases 1 to 4 are done (Phase 4's B1 before and after screenshots are still pending in `docs/verification.md`).
 
 1. Implement the phase, using `/tdd` where it fits.
 2. Run the standard checks and the phase's own checks until they pass.

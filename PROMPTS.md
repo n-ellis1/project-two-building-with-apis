@@ -28,6 +28,77 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Phase 4: covers, cover fallback, entry detail page and the B1 return-link fix
+
+Phase 4 started in an earlier session that produced Cycle 1 (the cover URL builder and its test)
+and ended when the computer restarted. That session's prompts weren't available to this session, so
+they aren't recorded here. The user confirmed that both Cycle 1 files survived the restart and that
+`uv run python manage.py test games.tests.test_covers` reran with 1 test, OK.
+
+### Prompts
+1. claude --continue
+
+   (Typed into the prompt rather than the shell, so this session started fresh without the earlier
+   conversation. I summarized the repo state from the untracked files and the plan.)
+2. Resume Phase 4 only. Read CLAUDE.md, the Phase 4 section of plans/video-game-tracker.md, games/covers.py, and games/tests/test_covers.py. My computer restarted after Cycle 1 went green. Both files survived, and I reran uv run python manage.py test games.tests.test_covers. It reported 1 test, OK.
+
+   Start Cycle 2 by writing the test for the rendered cover HTML. Check that a small cover has fixed dimensions, lazy loading, the game title as alt text, and a 2x srcset. Check that a game with no cover ID renders the local placeholder without a srcset or any JavaScript needed.
+
+   Run the focused test, show me that it fails for the expected reason, and pause before implementing the template tag or fallback script.
+3. I accept the Cycle 2 RED result. Implement the game_covers template tag and local placeholder as described. Keep the agreed cover dimensions and use the shared cover_url helper. Then rerun uv run python manage.py test games.tests.test_covers and show me the GREEN result for all three tests. Pause before adding the JavaScript fallback or wiring the tag into the saved-games list and detail page.
+4. I accept the Cycle 2 GREEN result. Write a focused failing test for the cover fallback. When a remote cover fails, it should switch to the local placeholder, remove srcset, and preserve the image dimensions and alt text. If the placeholder itself fails, the handler should leave it alone. An unrelated image error should also be ignored.
+
+   Use the existing test tooling where possible, and keep the browser check for a real blocked IGDB image request. Show me the RED result and pause before implementing the fallback. When wiring the tag into the detail page later, add the large-cover check for 264×374 and no srcset.
+5. I accept the RED result. Implement the fallback with the capture-phase listener and the local deferred script. Handle only images marked with data-cover-placeholder. Remove the marker and srcset before setting src to the placeholder, so a failed placeholder won't trigger another attempt. Keep the image's dimensions and alt text intact.
+
+   Rerun the focused cover tests and show me the GREEN result. Keep the blocked IGDB image request for manual browser verification. The temporary test page can be skipped. Pause before wiring the covers into the saved-games list or detail page.
+6. I accept the fallback GREEN result. Add small covers to My Saved Games, link each entry to its detail page, and build the detail page with a large cover. Use the existing owner-scoped lookup.
+
+   Add the test for a 264×374 detail cover without srcset. Test that the owner gets 200, a different user or a missing entry gets 404, and a signed-out visitor is redirected to login.
+
+   Run all five standard checks. Then give me exact browser steps to verify working covers, Scuffed Rocket League's missing-cover placeholder, and a hard reload with images.igdb.com blocked on both the list and detail pages. Include how to inspect a list image to confirm srcset was removed, how to unblock the requests afterward, and how to verify the cross-user 404.
+
+   Stop for my manual verification before marking Phase 4 complete, staging, committing, pushing, or starting Phase 5.
+7. The Phase 4 browser checks passed. I found one usability issue: when I open Alien: Isolation from page 2 of My Saved Games and click My Saved Games from the detail page, it sends me to page 1. I want that link to return me to the page I was browsing.
+
+   Carry the originating page through the detail link and use it for the My Saved Games return link from that detail page. Build the return link from the app's own saved-games route and a validated page number. If I opened the detail page directly with no originating page, default to page 1. Preserve the owner-scoped detail lookup.
+
+   Add regression tests for returning to page 2 and for the direct-entry default. Note in the plan that Phase 6 should extend this behavior to preserve search, filters, and sort. Run the standard checks and pause so I can repeat the browser steps and capture the after screenshot before we close Phase 4.
+8. I repeated the original browser steps. Opening Alien: Isolation from page 2 and clicking My Saved Games now takes me back to page 2. Record that result in the B1 verification entry and link the screenshots that are present. If the before screenshot is missing, flag it as pending so I can capture the original behavior separately.
+
+   Record the Phase 4 manual checks in docs/verification.md and append the session log to PROMPTS.md. Include the computer restart and successful Cycle 1 rerun, the browser issue I found, the fix I requested, and the successful page 2 retest. Only mark the direct-entry page 1 check as passed if I explicitly confirmed it.
+
+   Update CLAUDE.md if needed, run the five standard checks, and show me the results and git status --short. Flag any remaining verification before marking Phase 4 complete. Pause before staging, committing, pushing, or starting Phase 5.
+9. I verified that opening /games/7/ directly and clicking My Saved Games returns me to page 1. Record that as Pass. The earlier page-2 retest also passed.
+
+   Check which B1 screenshots are actually present in docs/verification/screenshots/. Link the files you find and flag any missing screenshot as pending reflection evidence. If the before image was recreated after the fix, label it as a reproduction. If you temporarily changed the return link for that screenshot, restore the fix and rerun the five standard checks.
+
+   Mark Phase 4's functional verification complete in the plan, update CLAUDE.md and PROMPTS.md, and show me git status --short. Leave the optional checks as unverified if I didn't report them. Stop before staging, committing, pushing, or starting Phase 5.
+
+### Summary
+- **Outcome:**
+  - **Cycle 1 (earlier session):** `games/covers.py` `cover_url` builds IGDB image URLs (`small`, `small_2x`, `large`) or `None` for a missing ID. Its test survived the restart and reran green.
+  - **Cycle 2:** `{% cover_img game size %}` (`games/templatetags/game_covers.py` and `games/_cover_img.html`) renders a fixed-size (90×128 small, 264×374 large), lazy `<img>` with the title as `alt`, a `2x` `srcset` for small covers, and the local `games/img/cover-placeholder.svg` (no `srcset`) when there's no cover ID. RED: both tests failed because the `game_covers` library didn't exist. GREEN: 3 tests.
+  - **Fallback:** `games/static/games/js/cover-fallback.js`, deferred in `base.html`, uses one capture-phase `error` listener and acts only on `img[data-cover-placeholder]`. It removes the marker and `srcset`, then sets `src` to the placeholder. Only remote covers carry the marker. RED: the three contract tests failed on the missing attribute, the missing static file and the missing `<script>` tag. GREEN: 6 tests.
+  - **Pages:** `/games/<id>/` (`entry_detail`) uses `get_owned_entry_or_404` and shows the large cover, details, tracking fields ("Not set" for blanks) and "Data from IGDB" with the last-refreshed time. My Saved Games rows show small covers and link to detail. New tests cover owner 200, other user and missing ID 404, signed-out redirect, and the 264×374 large cover without `srcset` (as requested in prompt 4). They failed with `NoReverseMatch` before the route existed.
+  - **Manual checks:** the user reported that the Phase 4 browser checks passed (working covers, Scuffed Rocket League placeholder, blocked `images.igdb.com` on list and detail, cross-user and missing-ID 404, signed-out redirect). Recorded in `docs/verification.md`; optional steps not separately reported are marked so.
+  - **B1 (browser usability issue found by the user):** the detail page's My Saved Games link went to page 1 after opening an entry from page 2. The reproduction was recorded in `docs/verification.md` before the fix. As the user requested, list rows on page 2 and later now link with `?page=N`, and the return link is rebuilt from the `games:saved_games` route and `parse_page`, defaulting to page 1, with the owner-scoped lookup unchanged. Five regression tests (page 2 return, direct-entry default, invalid and unsafe values, clean page-1 links, cross-user 404 with a page); three failed before the fix. The user retested and confirmed the page 2 return. The Phase 6 section of the plan now says to extend the link to search, filters and sort.
+  - The user then confirmed the B1 direct-entry check (`/games/7/` returns to page 1), recorded as Pass alongside the page 2 retest.
+  - All five standard checks pass with 82 tests. CLAUDE.md gained Covers and Detail return link notes and now says Phases 1 to 4 are done, with the B1 screenshots pending. Phase 4's acceptance criteria and checklist line are ticked in the plan as functionally verified. The optional Slow 3G, JavaScript-off and reverse cross-user checks are recorded as unverified because they weren't reported. Nothing staged, committed or pushed; Phase 5 not started.
+- **Deviations:**
+  - **Fallback testing approach:** the stack has no JavaScript engine and CLAUDE.md rules out Node, so the fallback tests check the HTML and static-file contract only. Its runtime behavior is verified in the browser. I offered a temporary test page for an unrelated broken image; the user skipped it.
+  - **Unrequested addition to the fallback:** because the script is deferred, a cover can fail before the listener exists. I added a startup sweep that switches marked images that are already broken (`complete` with `naturalWidth === 0`). It has no automated test; the blocked-domain browser check passed.
+  - **B1 was beyond the plan:** the user asked for the return-link fix and the Phase 6 note.
+  - **Pauses:** the user directed each TDD step and paused after every RED and GREEN.
+- **Sideways:**
+  - Prompt 1 was `claude --continue` typed into the chat, so the earlier conversation wasn't loaded and its prompts are missing from this log.
+  - Ruff format would have rewritten a single-quoted string in the new test; fixed before reporting RED.
+  - A first version of the fallback tests called one test class's `render` method from another class; it was replaced with a shared `render_cover` helper. `_ImgCollector` was renamed `ImgCollector` so the detail and list tests could use it.
+  - The first list template used `min-w-0`, which isn't a Bootstrap class; changed to `flex-grow-1`.
+  - The Phase 6 plan note was first inserted after that section's closing `---`; moved inside the section before its Commit heading.
+  - **Still pending at the end of the session:** the B1 before and after screenshots. A check of `docs/verification/screenshots/` and the whole repo found no B1 images, so both are flagged as pending reflection evidence. The before image will have to be a reproduction captured after the fix. The return link was never changed for a screenshot, so there was nothing to restore.
+  - No credentials or password values were printed, logged or written to files.
+
 ## 2026-11-15 — Phase 3: models, admin, demo seed and the basic My Saved Games list
 
 ### Prompts

@@ -74,13 +74,91 @@ contact IGDB.
 
 No browser bugs or usability issues were found in Phase 3.
 
+### Phase 4: Entry detail page and covers
+
+**Result: Functional verification passed (2026-11-15). Reflection evidence pending:** the B1 before
+and after screenshots. Automated checks: all five standard checks pass, 82 tests. Manual steps run by the user in Chrome with `uv run python manage.py runserver`, signed in as
+the seeded demo users (password from `DEMO_PASSWORD`, value not recorded). The user reported "The
+Phase 4 browser checks passed" for steps A to D as given; optional steps that weren't separately
+reported are marked unverified. Entry IDs are from the local seeded database: `demo_a` Alien: Isolation = 7,
+`demo_b` The Witcher 3 = 16, `demo_b` Scuffed Rocket League = 28.
+
+| # | Step | Expected | Result | Date |
+|---|---|---|---|---|
+| A1–A3 | `demo_a` My Saved Games; inspect a list cover | Small 90×128 cover per row; `t_cover_small` `src`, `t_cover_small_2x … 2x` `srcset`, `loading="lazy"`, title as `alt`, `data-cover-placeholder` | Pass | 2026-11-15 |
+| A4 | Zoom to 200% | Covers stay sharp (2x source) | Pass | 2026-11-15 |
+| A5 | Optional: Disable cache + Slow 3G reload | Rows don't shift while covers load | Unverified (optional, not reported) | 2026-11-15 |
+| A6–A7 | Open Alien: Isolation (`/games/7/`); inspect the cover | Large 264×374 `t_cover_big` cover with no `srcset`; details, tracking data, "Data from IGDB" link and last-refreshed time | Pass | 2026-11-15 |
+| B1–B3 | `demo_b`: Scuffed Rocket League on the list and at `/games/28/` | Local placeholder at 90×128 and 264×374, no `srcset`, no `data-cover-placeholder`; all text shown | Pass | 2026-11-15 |
+| B4 | Optional: JavaScript disabled, reload | Placeholder still shown | Unverified (optional, not reported) | 2026-11-15 |
+| C1–C7 | Block `images.igdb.com` (Disable cache on), hard reload My Saved Games; inspect The Witcher 3 cover | Every cover switches to the placeholder; `srcset` and `data-cover-placeholder` removed; `width`, `height` and `alt` unchanged; all titles, badges, statuses and platforms shown; no repeating console errors | Pass | 2026-11-15 |
+| C8 | Same, hard reload `/games/16/` | Large placeholder at 264×374; all details and tracking fields shown | Pass | 2026-11-15 |
+| C9 | Unblock, untick Disable cache, hard reload | Real covers return | Pass | 2026-11-15 |
+| D1–D2 | `demo_b` opens `/games/7/` (A's entry) and `/games/999999/` | The same 404 page for both; no game title shown | Pass | 2026-11-15 |
+| D3 | Optional: `demo_a` opens `/games/28/` | 404 | Unverified (optional, not reported) | 2026-11-15 |
+| D4 | Signed out, open `/games/7/` | Redirected to login with `?next=/games/7/` | Pass | 2026-11-15 |
+
+One usability issue was found during these checks and fixed: [B1](#b1-phase-4-my-saved-games-link-on-the-detail-page-loses-the-list-page).
+
+Automated coverage for the same behavior: `games/tests/test_covers.py` (URL builder for each size
+and a missing ID, small cover attributes and `2x` `srcset`, placeholder without `srcset` or JS, the
+fallback marker on remote covers only, the fallback script as a local deferred static file on every
+page), `games/tests/test_entry_detail.py` (owner 200, other user's and missing entry 404, signed-out
+redirect, large 264×374 cover without `srcset`, large placeholder, details and tracking fields,
+"Not set" for blanks, the B1 return-link tests) and `games/tests/test_saved_games.py` (detail links,
+small covers and placeholder on the list).
+
+The fallback script's runtime behavior (switching a failed cover, removing `srcset`, leaving a failed
+placeholder alone) has no automated test, because the stack has no JavaScript engine. Steps C1–C8
+are its verification. A deliberately unrelated broken image wasn't tested; the temporary test page
+for it was skipped by the user's choice.
+
 ## Browser bugs and usability fixes (Reflection Question 5)
 
 Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** screenshot, the fix
 (file and line references), **after** screenshot taken by repeating the same steps, and the test added
 (where practical).
 
-_No entries yet._
+### B1 (Phase 4): My Saved Games link on the detail page loses the list page
+
+- **Found:** 2026-11-15, during Phase 4 manual verification.
+- **Reproduction:**
+  1. Sign in as `demo_a` and open My Saved Games.
+  2. Click **Next** to go to page 2 (`/games/?page=2`).
+  3. Click **Alien: Isolation** to open its detail page.
+  4. Click **← My Saved Games**.
+- **Expected:** back on page 2 (`/games/?page=2`), where the entry was opened from.
+- **Actual:** page 1 (`/games/`). The detail link carried no page, and the return link always
+  pointed at the bare saved-games route.
+- **Before screenshot:** **pending reflection evidence.** Not captured before the fix; checked on
+  2026-11-15 and no file exists. The user will capture the original behavior separately as
+  `verification/screenshots/phase4-b1-before.png` (to be labelled as a reproduction, see below).
+- **Fix:** list rows link to `/games/<id>/?page=N` when on page 2 or later
+  (`games/templates/games/saved_games.html:16` and `:19`). The detail view passes `?page` through
+  `parse_page` and builds the return link from the `games:saved_games` route with
+  `saved_games_url()` (`games/views.py:37`, used at `games/views.py:58`). The link is rendered at
+  `games/templates/games/entry_detail.html:5`. Anything that isn't a positive whole number, including
+  an outside URL or markup, falls back to page 1 and is never echoed. The entry is still looked up
+  with `get_owned_entry_or_404`. Phase 6 extends the same link to keep search, filters and sort (noted
+  in the plan).
+- **Retest after the fix (2026-11-15):**
+
+  | Step | Expected | Result |
+  |---|---|---|
+  | Repeat the reproduction steps 1–4 | Back on `/games/?page=2` | **Pass**: the user confirmed that opening Alien: Isolation from page 2 and clicking My Saved Games returns to page 2 |
+  | Open `/games/7/` directly, click **← My Saved Games** | `/games/` (page 1) | **Pass**: the user confirmed it returns to page 1 |
+  | Optional: `/games/7/?page=https://example.com/`, hover the link | Points at `/games/` | Not verified in the browser (covered by an automated test) |
+
+- **After screenshot:** **pending reflection evidence.** Checked on 2026-11-15: no B1 image exists
+  in `verification/screenshots/` or anywhere else in the repo. Expected as
+  `verification/screenshots/phase4-b1-after.png`.
+- **Screenshot note:** if the before image is captured now that the fix is in place, it must be a
+  recreation of the old behavior and will be labelled **reproduction** here. The return link wasn't
+  changed for any screenshot so far.
+- **Tests:** `games/tests/test_entry_detail.py:55` (`ReturnToSavedGamesPageTests`): opening an entry
+  from page 2 returns to page 2; direct entry returns to page 1; empty, `1`, `0`, `-1`, `abc`, `2.5`,
+  an outside URL and injected markup all return to page 1; page-1 links carry no page; another user's
+  entry with `?page=2` is still 404. All five standard checks pass (82 tests).
 
 ## Back/Forward query state (Reflection Question 4)
 

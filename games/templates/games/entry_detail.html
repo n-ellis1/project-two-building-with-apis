@@ -1,0 +1,62 @@
+{% extends "games/base.html" %}
+{% load game_covers %}
+{% block title %}{{ game.name }}{% endblock %}
+{% block content %}
+<p class="mb-3"><a href="{{ saved_games_return_url }}" data-testid="saved-games-return">&larr; My Saved Games</a></p>
+<div class="row g-4">
+  <div class="col-12 col-md-auto">
+    {% cover_img game "large" %}
+  </div>
+  <div class="col">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <h1 class="h3 mb-0">{{ game.name }}</h1>
+      {% if game.category_badge %}
+        <span class="badge text-bg-info" data-testid="category-badge">{{ game.category_badge }}</span>
+      {% endif %}
+      {% if entry.favorite %}
+        <span class="badge text-bg-warning" data-testid="favorite-badge">★ Favorite</span>
+      {% endif %}
+    </div>
+    {% if game.summary %}<p>{{ game.summary|linebreaksbr }}</p>{% endif %}
+
+    <h2 class="h5 mt-4">Game details</h2>
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Release date</dt>
+      <dd class="col-sm-8">{{ game.first_release_date|date:"F j, Y"|default:"Unknown" }}</dd>
+      <dt class="col-sm-4">Platforms</dt>
+      <dd class="col-sm-8">{% for p in game.platforms.all %}{{ p.name }}{% if not forloop.last %}, {% endif %}{% empty %}Unknown{% endfor %}</dd>
+      <dt class="col-sm-4">Genres</dt>
+      <dd class="col-sm-8">{% for g in game.genres.all %}{{ g.name }}{% if not forloop.last %}, {% endif %}{% empty %}Unknown{% endfor %}</dd>
+      <dt class="col-sm-4">Themes</dt>
+      <dd class="col-sm-8">{% for t in game.themes.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% empty %}Unknown{% endfor %}</dd>
+    </dl>
+
+    <h2 class="h5 mt-4">My tracking</h2>
+    <dl class="row mb-0" data-testid="tracking">
+      <dt class="col-sm-4">Status</dt>
+      <dd class="col-sm-8"><span class="badge text-bg-secondary">{{ entry.get_status_display }}</span></dd>
+      <dt class="col-sm-4">Favorite</dt>
+      <dd class="col-sm-8">{{ entry.favorite|yesno:"Yes,No" }}</dd>
+      <dt class="col-sm-4">Rating</dt>
+      <dd class="col-sm-8">{% if entry.rating %}{{ entry.rating }}/10{% else %}Not set{% endif %}</dd>
+      <dt class="col-sm-4">Platform played</dt>
+      <dd class="col-sm-8">{{ entry.platform_played|default:"Not set" }}</dd>
+      <dt class="col-sm-4">Start date</dt>
+      <dd class="col-sm-8">{{ entry.start_date|date:"F j, Y"|default:"Not set" }}</dd>
+      <dt class="col-sm-4">Finish date</dt>
+      <dd class="col-sm-8">{{ entry.finish_date|date:"F j, Y"|default:"Not set" }}</dd>
+      <dt class="col-sm-4">Hours played</dt>
+      <dd class="col-sm-8">{% if entry.hours_played is not None %}{{ entry.hours_played }}{% else %}Not set{% endif %}</dd>
+      <dt class="col-sm-4">Notes</dt>
+      <dd class="col-sm-8">{% if entry.notes %}{{ entry.notes|linebreaksbr }}{% else %}Not set{% endif %}</dd>
+      <dt class="col-sm-4">Date added</dt>
+      <dd class="col-sm-8">{{ entry.created_at|date:"F j, Y" }}</dd>
+    </dl>
+
+    <p class="small text-body-secondary mt-4 mb-0" data-testid="igdb-attribution">
+      {% if game.igdb_url %}<a href="{{ game.igdb_url }}" rel="noopener">Data from IGDB</a>{% else %}Data from IGDB{% endif %}
+      · last refreshed {{ game.last_fetched_at|date:"F j, Y, g:i a" }}
+    </p>
+  </div>
+</div>
+{% endblock %}

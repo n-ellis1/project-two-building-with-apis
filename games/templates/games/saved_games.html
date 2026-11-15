@@ -1,4 +1,5 @@
 {% extends "games/base.html" %}
+{% load game_covers %}
 {% block title %}My Saved Games{% endblock %}
 {% block content %}
 <h1 class="h3 mb-4">My Saved Games</h1>
@@ -8,20 +9,25 @@
     · sorted by Date Added (Newest First)
   </p>
   <ul class="list-group shadow-sm mb-3" data-testid="entry-list">
+    {# Detail links carry the list page so the detail page can return to it (B1). #}
     {% for entry in page_obj %}
-      <li class="list-group-item py-3" data-testid="entry-row">
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-          <span class="fw-semibold">{{ entry.game.name }}</span>
-          {% if entry.game.category_badge %}
-            <span class="badge text-bg-info" data-testid="category-badge">{{ entry.game.category_badge }}</span>
-          {% endif %}
-          {% if entry.favorite %}
-            <span class="badge text-bg-warning" data-testid="favorite-badge">★ Favorite</span>
-          {% endif %}
-        </div>
-        <div class="small text-body-secondary">
-          <span class="badge text-bg-secondary me-1">{{ entry.get_status_display }}</span>
-          {% for platform in entry.game.platforms.all %}{{ platform.name }}{% if not forloop.last %}, {% endif %}{% empty %}Platforms unknown{% endfor %}
+      {% url 'games:entry_detail' entry.pk as detail_url %}
+      <li class="list-group-item py-3 d-flex gap-3 align-items-start" data-testid="entry-row">
+        <a href="{{ detail_url }}{% if page_obj.number > 1 %}?page={{ page_obj.number }}{% endif %}" class="flex-shrink-0" tabindex="-1" aria-hidden="true">{% cover_img entry.game "small" %}</a>
+        <div class="flex-grow-1">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <a class="fw-semibold" href="{{ detail_url }}{% if page_obj.number > 1 %}?page={{ page_obj.number }}{% endif %}">{{ entry.game.name }}</a>
+            {% if entry.game.category_badge %}
+              <span class="badge text-bg-info" data-testid="category-badge">{{ entry.game.category_badge }}</span>
+            {% endif %}
+            {% if entry.favorite %}
+              <span class="badge text-bg-warning" data-testid="favorite-badge">★ Favorite</span>
+            {% endif %}
+          </div>
+          <div class="small text-body-secondary">
+            <span class="badge text-bg-secondary me-1">{{ entry.get_status_display }}</span>
+            {% for platform in entry.game.platforms.all %}{{ platform.name }}{% if not forloop.last %}, {% endif %}{% empty %}Platforms unknown{% endfor %}
+          </div>
         </div>
       </li>
     {% endfor %}

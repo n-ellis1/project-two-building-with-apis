@@ -3,13 +3,16 @@
 from datetime import timedelta
 from unittest import mock
 
+from django.templatetags.static import static
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from games.covers import cover_url
 from games.models import GameCategory
 
 from .factories import make_entry, make_game, make_user
+from .test_covers import ImgCollector
 
 URL = reverse("games:saved_games")
 
@@ -108,6 +111,28 @@ class ListingTests(TestCase):
         self.assertContains(response, 'data-testid="category-badge"', count=1)
         self.assertContains(response, ">Expansion</span>")
         self.assertNotContains(response, "Main Game")
+
+    def test_rows_link_to_detail_and_show_small_covers_or_the_placeholder(self):
+        with_cover = make_entry(self.user, make_game("Celeste", cover_image_id="co3byy"))
+        no_cover = make_entry(self.user, make_game("Scuffed Rocket League", cover_image_id=""))
+
+        response = self.client.get(URL)
+
+        for entry in (with_cover, no_cover):
+            with self.subTest(game=entry.game.name):
+                self.assertContains(
+                    response, f'href="{reverse("games:entry_detail", args=[entry.pk])}"'
+                )
+        parser = ImgCollector()
+        parser.feed(response.content.decode())
+        covers = {img["alt"]: img for img in parser.imgs if "game-cover" in img.get("class", "")}
+        self.assertEqual(covers["Celeste"]["src"], cover_url("co3byy", "small"))
+        self.assertEqual(covers["Celeste"]["srcset"], f"{cover_url('co3byy', 'small_2x')} 2x")
+        self.assertEqual((covers["Celeste"]["width"], covers["Celeste"]["height"]), ("90", "128"))
+        self.assertEqual(
+            covers["Scuffed Rocket League"]["src"], static("games/img/cover-placeholder.svg")
+        )
+        self.assertNotIn("srcset", covers["Scuffed Rocket League"])
 
     def test_empty_state_for_a_user_with_no_entries(self):
         make_entries(make_user("someone_else"), "Not Mine", 3)

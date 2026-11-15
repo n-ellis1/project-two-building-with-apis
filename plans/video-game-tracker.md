@@ -257,11 +257,13 @@ One shared cover URL builder (stored image ID → IGDB image server, small size 
 
 ### Acceptance criteria
 
-- [ ] The owner sees the full detail page. Another user's entry ID returns 404, the same as an ID that doesn't exist.
-- [ ] Cover URLs come from one builder. List covers have a 2x source set and detail uses the large size.
-- [ ] Every cover `<img>` has width, height, `loading="lazy"` and the game name as alt.
-- [ ] A game with no cover ID renders the placeholder without needing JS.
-- [ ] When covers fail, every title, platform and tracking field is still shown.
+- [x] The owner sees the full detail page. Another user's entry ID returns 404, the same as an ID that doesn't exist.
+- [x] Cover URLs come from one builder. List covers have a 2x source set and detail uses the large size.
+- [x] Every cover `<img>` has width, height, `loading="lazy"` and the game name as alt.
+- [x] A game with no cover ID renders the placeholder without needing JS.
+- [x] When covers fail, every title, platform and tracking field is still shown.
+
+Functional verification passed on 2026-11-15 (`docs/verification.md`, Phase 4 and B1). The B1 before and after screenshots are still pending as reflection evidence.
 
 ### Automated checks
 
@@ -391,6 +393,10 @@ Standard checks, plus query-builder tests (each field, distinct, each filter, th
 6. Sign in as demo user B: the Theme dropdown has no Horror or Survival, and `?theme=19` is ignored.
 7. Disable JavaScript in DevTools and repeat step 2: full page loads, same agreement between URL, controls and results.
 8. Search for a word that matches no entry: empty-state message.
+
+### Carried over from Phase 4 (bug B1 in `docs/verification.md`)
+
+Detail links on My Saved Games carry the list's page (`/games/<id>/?page=2`), and the detail page's "My Saved Games" link returns to that page. It is built only from the saved-games route and a page validated by `parse_page`, and it defaults to page 1. Phase 6 extends the same return link to keep the search, filters (Status, Platform Played, Favorite, Theme) and sort, and must validate each value the same way the list does (unknown values dropped, never echoed). Add tests that a detail page opened from a searched, filtered, sorted page returns to that exact list state, and that another user's theme ID or an invalid sort isn't carried over. Repeat the B1 browser steps from a searched, filtered, sorted page 2.
 
 ### Commit
 
@@ -704,7 +710,7 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Initial root `CLAUDE.md` (before the first `/implement` phase; commit `f0750a4`)
 - [x] Phase 2: Project skeleton, accounts and site layout
 - [x] Phase 3: Models, admin, demo seed and basic My Saved Games
-- [ ] Phase 4: Entry detail page and covers
+- [x] Phase 4: Entry detail page and covers (functional verification complete; B1 screenshots pending)
 - [ ] Phase 5: Edit and delete entries
 - [ ] Phase 6: Search, filters, Theme, sorts and pagination
 - [ ] Phase 7: IGDB client and IGDB search page
