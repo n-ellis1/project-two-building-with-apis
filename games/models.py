@@ -30,6 +30,22 @@ class GameCategory(models.IntegerChoices):
 ELIGIBLE_GAME_CATEGORIES = frozenset({0, 1, 2, 4, 6, 7, 8, 9, 10, 11, 12})
 
 
+def is_eligible(game_category, version_parent) -> bool:
+    """The one eligibility rule for new saves, in Python (search applies the same rule
+    as `igdb.ELIGIBILITY_WHERE`).
+
+    Eligible only if there is no version parent (records with one are editions) and the
+    Game Category is on the allowlist. 0 (Main Game) is valid; a missing type (None) or a
+    non-integer is not, and neither is any type not yet reviewed.
+    """
+    return (
+        version_parent is None
+        and isinstance(game_category, int)
+        and not isinstance(game_category, bool)
+        and game_category in ELIGIBLE_GAME_CATEGORIES
+    )
+
+
 class IgdbNamedItem(models.Model):
     """A platform, genre or theme imported from IGDB."""
 

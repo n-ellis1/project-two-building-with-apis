@@ -7,7 +7,7 @@ from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.cache import patch_vary_headers
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
 from . import igdb
 from .forms import EntryForm, SignupForm
@@ -28,6 +28,7 @@ from .queries import (
     user_platforms_played,
     user_themes,
 )
+from .saving import SaveFailed, save_game
 
 
 def home(request):
@@ -184,7 +185,7 @@ def search(request):
     with the clean URL in `HX-Push-Url`; normal requests and history restores get the
     full page (the same rules as My Saved Games).
     """
-    q = " ".join(str(request.GET.get("q", "")).split())[:MAX_SEARCH_LENGTH]
+    q = clean_search_text(request.GET.get("q", ""))
     page = parse_page(request.GET.get("page"))
     context = {
         "q": q,
@@ -228,6 +229,69 @@ def search(request):
         response = render(request, "games/search.html", context)
     patch_vary_headers(response, ["HX-Request", "HX-History-Restore-Request"])
     return response
+
+
+def clean_search_text(value) -> str:
+    """Search text with runs of whitespace collapsed, cut to the box's maximum length."""
+    return " ".join(str(value).split())[:MAX_SEARCH_LENGTH]
+
+
+# The largest ID a Game's IGDB ID column holds; anything bigger can't be a real game.
+MAX_IGDB_ID = 2_147_483_647
+
+# Messages tagged with this get a "Go to My Saved Games" link (upstream, configuration
+# and unexpected failures), like the search page's own error alert.
+SAVED_GAMES_LINK_TAG = "saved-games-link"
+NO_LINK_CODES = {"igdb_game_not_found", "game_category_excluded"}
+ALREADY_SAVED_MESSAGE = "Already in your games"
+
+
+def parse_igdb_id(value) -> int | None:
+    """A positive IGDB ID from a form value, or None. Digits only, no signs or spaces."""
+    text = str(value or "")
+    if not (text.isascii() and text.isdigit() and len(text) <= 10):
+        return None
+    number = int(text)
+    return number if 0 < number <= MAX_IGDB_ID else None
+
+
+@login_required
+@require_POST
+def search_save(request):
+    """Save a search result to my games through the save service (POST only, CSRF
+    checked by middleware). The owner is always the signed-in user.
+
+    - **New save:** to the entry's edit page.
+    - **Already mine:** to my existing entry, with "Already in your games".
+    - **Failure:** back to the same search (`q`, `page`) with the fixed message. The
+      message is stored in the session, so it still shows even if reloading the
+      results fails too.
+    """
+    q = clean_search_text(request.POST.get("q", ""))
+    page = parse_page(request.POST.get("page"))
+    back_to_search = search_url(q, page)
+
+    igdb_id = parse_igdb_id(request.POST.get("igdb_id"))
+    if igdb_id is None:
+        # Never sent to IGDB: it can't be a real game ID.
+        messages.error(request, igdb.MESSAGES["igdb_game_not_found"])
+        return redirect(back_to_search)
+
+    try:
+        result = save_game(request.user, igdb_id)
+    except igdb.IgdbError as error:
+        tags = "" if error.code in NO_LINK_CODES else SAVED_GAMES_LINK_TAG
+        messages.error(request, error.message, extra_tags=tags)
+        return redirect(back_to_search)
+    except SaveFailed as error:
+        messages.error(request, error.message, extra_tags=SAVED_GAMES_LINK_TAG)
+        return redirect(back_to_search)
+
+    if not result.created:
+        messages.info(request, ALREADY_SAVED_MESSAGE)
+        return redirect("games:entry_detail", entry_id=result.entry.pk)
+    messages.success(request, f"Added {result.entry.game.name} to your games.")
+    return redirect("games:entry_edit", entry_id=result.entry.pk)
 
 
 def with_saved_entries(user, games) -> list[dict]:

@@ -40,7 +40,12 @@
     {% if messages %}
       <div class="mb-3" aria-live="polite">
         {% for message in messages %}
-          <div class="alert alert-{{ message.tags|default:'info' }}" role="alert">{{ message }}</div>
+          <div class="alert alert-{{ message.level_tag|default:'info' }}" role="alert" data-testid="message">
+            {{ message }}
+            {% if "saved-games-link" in message.extra_tags %}
+              <a class="alert-link ms-1" href="{% url 'games:saved_games' %}">Go to My Saved Games</a>
+            {% endif %}
+          </div>
         {% endfor %}
       </div>
     {% endif %}

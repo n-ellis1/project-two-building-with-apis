@@ -488,12 +488,17 @@ The save service (reused by the API in Phase 10):
 
 ### Acceptance criteria
 
-- [ ] A new save creates the Game, its links, and an entry with Want to Play and not favorite, then lands on edit.
-- [ ] Saving again gives "Already in your games" on the existing entry. A simulated simultaneous save (integrity error) never creates two entries and is reported as a duplicate only when the same user's entry exists.
-- [ ] With the IGDB client failing, saving a game already stored by another user succeeds with no IGDB call, and saving a new game shows the error and leaves no Game, link or Entry rows.
-- [ ] Posting an excluded IGDB ID directly is rejected with "This release can't be saved. Search for the base game or a supported release." Test cases: a version-parent edition typed Main Game (DS3 Day One Edition), a Bundle, a Mod, a Pack / Addon, an Update, and an unknown future type ID. A stored Game with a stored version parent, or a stored Game Category off the allowlist, is also rejected (without an IGDB call).
-- [ ] Failure redirects keep `q` and `page`, and the message shows even when the results reload also fails.
-- [ ] GET on `/search/save/` is rejected. Signed-out POST redirects to login. The owner always comes from the session.
+- [x] A new save creates the Game, its links, and an entry with Want to Play and not favorite, then lands on edit.
+- [x] Saving again gives "Already in your games" on the existing entry. A simulated simultaneous save (integrity error) never creates two entries and is reported as a duplicate only when the same user's entry exists.
+- [x] With the IGDB client failing, saving a game already stored by another user succeeds with no IGDB call, and saving a new game shows the error and leaves no Game, link or Entry rows.
+- [x] Posting an excluded IGDB ID directly is rejected with "This release can't be saved. Search for the base game or a supported release." Test cases: a version-parent edition typed Main Game (DS3 Day One Edition), a Bundle, a Mod, a Pack / Addon, an Update, and an unknown future type ID. A stored Game with a stored version parent, or a stored Game Category off the allowlist, is also rejected (without an IGDB call).
+- [x] Failure redirects keep `q` and `page`, and the message shows even when the results reload also fails.
+- [x] GET on `/search/save/` is rejected. Signed-out POST redirects to login. The owner always comes from the session.
+
+**Result (2026-11-15):** all standard checks pass (241 tests). The user ran the browser checklist and reported that it looked good; individual steps weren't reported one by one, so `docs/verification.md` records them as unverified in the browser (no issue reported) alongside their automated tests, and the outage-save run's new game title and ID as not recorded.
+- **Save service** `games/saving.py` (`save_game` → `SaveResult(entry, created)`, `SaveFailed` with a generic message). The user's existing entry is checked first ("Already in your games", before eligibility; user decision). The shared rule `is_eligible()` (`games/models.py`) runs before any write on both the stored and the fetched path.
+- **Fetch by ID** (`igdb.fetch_game`) asks for `where id = N;` only, with no eligibility clause, so an excluded ID gets the excluded message rather than "not found", and Phase 9 can fetch a reclassified game. Search keeps the clause. Recorded in the PRD and CLAUDE.md (user decision).
+- **Failures:** only an `IntegrityError` can be a duplicate, and only when the requesting user's entry is confirmed after the rollback; other database errors give the generic message. A colliding new-Game insert is retried once as a stored Game (eligibility rechecked, no second IGDB call). Race tests use a `TransactionTestCase` with the other request committed on a second thread.
 
 ### Automated checks
 
@@ -522,6 +527,63 @@ Standard checks, plus save-service tests (new, reuse, stored-excluded, excluded 
 ### Commit
 
 `Add saving games from IGDB search through the save service`
+
+---
+
+## Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page
+
+**Recorded 2026-11-15. Not started:** implement only after the Phase 8 commit, and before Phase 9.
+
+**User request**: on the blank Search IGDB page, show the games most visited on IGDB, and let me open any IGDB game (saved or not) inside the tracker and save it from there.
+
+**Dependencies**: Phase 7 (client, covers, search page), Phase 8 (`fetch_game`, save service, `/search/save/`).
+
+### What to build
+
+- **"Popular on IGDB" row** on `/search/`, only when there is no search term (`q` blank after cleaning), directly under the search box. One horizontally scrollable row of up to 10 cards, in rank order.
+  - **Data:** IGDB PopScore, the **visits** ranking (`popularity_primitives` with the IGDB Visits popularity type). It returns game IDs only, so the client asks for more primitives than needed (for example 30–50), then fetches those games in one request with `ELIGIBILITY_WHERE` plus `id = (…)`, keeps PopScore's order, drops ineligible ones, and keeps the first 10. That's two IGDB requests per refresh, made through the one client module (same token, errors and secrets rules).
+  - **Cards:** the real cover (`{% cover_img game "small" %}`, with the existing placeholder for a missing or failed cover) and the title. The cover and title together are one link to the IGDB game detail page.
+  - **Cache:** the finished row (IDs, titles, cover IDs) in Django's cache under a key with no secrets, for a fixed time (proposed: 1 hour). One shared row for every user, so the cache holds no per-user data. A failed refresh is not cached as a result.
+  - **Failure:** if the feed fails (any `IgdbError`) or returns nothing eligible, the row is simply left out (or replaced by a quiet one-line note); the search box and the rest of the page work as now. Never an error banner that blocks searching.
+  - **Scrolling:** CSS only (`overflow-x: auto`, fixed card width), keyboard reachable links, no JavaScript needed. Covers lazy-load as everywhere else.
+- **IGDB game detail page** by IGDB ID (login required), proposed route `/search/games/<int:igdb_id>/` (named `games:igdb_game`), so it can't be confused with `/games/<entry id>/`.
+  - **Shows:** large cover, title, Game Category badge, summary, release date and platforms.
+  - **Data source:** a stored Game is read from SQLite (works during an outage). An unstored game is fetched with `igdb.fetch_game` (one request; an unknown ID → 404 page with the fixed message; an outage → the fixed message with the My Saved Games link and the Search IGDB link).
+  - **Actions:** if I already saved it, a link to **my** entry (owner-scoped lookup, the same as Saved links). Otherwise, if it is eligible, a Save button posting to the existing `/search/save/` flow. An ineligible game shows no Save button, only the excluded message. Always a link back to Search IGDB.
+  - **Save from detail:** `/search/save/` gains an optional, validated return target, so a failed save from this page comes back to the detail page with the message (the target is rebuilt from the posted IGDB ID on our own route, never echoed from the request). New saves and duplicates behave as in Phase 8.
+- **Search results** may link their titles to the same detail page (optional; decide during implementation).
+
+### Acceptance criteria
+
+- [ ] With no search term, the row shows up to 10 eligible games in PopScore visits order, each with its cover (or the placeholder) and title as one link to the detail page. With a search term, the row isn't rendered and no popularity request is made.
+- [ ] Ineligible games in the PopScore list are skipped, and the row still fills from the following ranks.
+- [ ] A second blank-page load within the cache time makes no IGDB request. After expiry, the row is fetched again.
+- [ ] When the feed fails (timeout, unreachable, rate limit, misconfigured, unavailable), the page returns 200 with a working search box and no row; the failure isn't cached.
+- [ ] The detail page shows cover, summary, release date and platforms for both a stored and an unstored game. Mine shows a link to my entry; another user's saved game shows Save for me; an ineligible game shows no Save.
+- [ ] Saving from the detail page uses the save service: a new save lands on edit, a duplicate on my entry with "Already in your games", a failure returns to the detail page with the message.
+- [ ] Signed-out visitors are redirected to login for both the search page and the detail page, and IGDB is never called.
+
+### Automated checks
+
+Standard checks, plus client tests with mocked HTTP (PopScore query body, rank order kept, eligibility filter, fewer than 10 eligible, each failure mapping, no secrets in cache keys), view tests with the client mocked at its boundary (row only on a blank search, cached second load, feed failure leaves search working, detail page for stored/unstored/unknown/outage, Saved-entry link scoped to the owner, Save return target), and template checks for the cover link and placeholder markup.
+
+### Before implementing (to confirm)
+
+- Verify the PopScore endpoint, the visits `popularity_type` ID and the response shape against the official IGDB docs and one live request from a throwaway scratchpad script (IDs and counts only, no credentials printed), and record it in `docs/research/`.
+- Confirm the cache time, and whether results' titles should link to the detail page.
+- Add a short PRD addendum (a new user story for the popular row and the IGDB detail page; it stays within the existing storage and Twitch terms notes, caching only IDs, titles and cover IDs).
+
+### Manual verification (browser, live IGDB)
+
+1. Open Search IGDB with no term: the row shows up to 10 covers and titles, scrolls horizontally (including at phone width), and each card opens the detail page.
+2. Search a title: the row disappears. Clear the search: it returns (and loads from cache).
+3. Open the detail page for an unsaved game and click Save: lands on edit. Open it again: the link to my entry replaces Save.
+4. As the other demo user, open the same game: Save is shown, not a link to the first user's entry.
+5. Turn off Wi-Fi with the cache cleared (restart the server): the blank search page loads with a working search box and no row. A stored game's detail page still shows its details.
+
+### Commit
+
+`Add Popular on IGDB row and IGDB game detail page`
 
 ---
 
@@ -723,7 +785,8 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Phase 5: Edit and delete entries
 - [x] Phase 6: Search, filters, Theme, sorts and pagination (no browser issues reported; RQ4 screenshot pending)
 - [x] Phase 7: IGDB client and IGDB search page (ordering kept as a known limitation; B2 and B3 screenshots pending)
-- [ ] Phase 8: Save a game from search
+- [x] Phase 8: Save a game from search (browser steps not reported individually)
+- [ ] Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page (recorded 2026-11-15; implement after the Phase 8 commit, before Phase 9)
 - [ ] Phase 9: Refresh from IGDB
 - [ ] Phase 10: Saved-entry REST API
 - [ ] Phase 11: Command-line client (lesson checkpoint)

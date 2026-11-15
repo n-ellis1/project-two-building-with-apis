@@ -252,7 +252,7 @@ Saved entries are private: each user sees and changes only their own, and attemp
   | 13 | Pack / Addon | Exclude | |
   | 14 | Update | Exclude | |
 
-- IGDB search and import both use `where version_parent = null & game_type = (0,1,2,4,6,7,8,9,10,11,12);`. The save service applies the same rule in Python to a fetched record and to a Game already stored locally.
+- IGDB search uses `where version_parent = null & game_type = (0,1,2,4,6,7,8,9,10,11,12);`, so excluded releases never appear and the "ask for 11, show 10" Next rule stays accurate. Fetching one game by ID (for a save, and for refresh) asks for that ID alone, without the eligibility clause, and the save service then applies the same rule in Python to the fetched record, as it does to a Game already stored locally. **Decided 2026-11-15 (Phase 8):** with the clause on the fetch, an excluded ID sent directly would come back empty and be reported as "IGDB has no game with that ID." instead of the excluded message, and refresh needs to fetch a game that has become ineligible to store its new classification.
 - The UI calls this "Game Category" (and "Game Categories" for the group). Badges use IGDB's labels, and Main Game has no badge. Badges appear on the search and saved-games pages. There is no Game Category filter.
 
 ### IGDB search page

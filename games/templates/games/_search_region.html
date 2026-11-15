@@ -34,10 +34,19 @@
             · {{ game.platforms|join:", "|default:"Platforms unknown" }}
           </div>
         </div>
-        {# Unsaved results get a Save button in Phase 8. #}
         {% if row.saved_entry_id %}
           <a class="btn btn-outline-success btn-sm flex-shrink-0 align-self-center" data-testid="saved-link"
              href="{% url 'games:entry_detail' row.saved_entry_id %}">Saved</a>
+        {% else %}
+          {# An ordinary POST form (no HTMX): it must redirect to the edit page. #}
+          {# q and page bring a failed save back to these same results. #}
+          <form method="post" action="{% url 'games:search_save' %}" class="flex-shrink-0 align-self-center m-0" data-testid="save-form">
+            {% csrf_token %}
+            <input type="hidden" name="igdb_id" value="{{ game.igdb_id }}">
+            <input type="hidden" name="q" value="{{ q }}">
+            <input type="hidden" name="page" value="{{ page }}">
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          </form>
         {% endif %}
       </li>
     {% endwith %}{% endfor %}

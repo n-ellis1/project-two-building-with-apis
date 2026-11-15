@@ -428,3 +428,127 @@ class RequestAndParsingTests(SimpleTestCase):
         self.assertEqual(witcher.platforms, ())
         self.assertEqual(witcher.cover_image_id, "")
         self.assertEqual(old.first_release_date, date(1969, 12, 31))
+
+
+@override_settings(IGDB_CLIENT_ID=FAKE_CLIENT_ID, IGDB_CLIENT_SECRET=FAKE_SECRET)
+class FetchGameTests(SimpleTestCase):
+    """`fetch_game(igdb_id)` for the save service: one request by ID, no eligibility
+    clause, every stored field parsed, and the same failure mapping as search."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    def fetch(self, records, igdb_id=1942):
+        fake = FakeHttp(
+            twitch=[token_response(FAKE_TOKEN_1)], igdb_responses=[FakeResponse(200, records)]
+        )
+        with mock.patch("games.igdb.requests.post", side_effect=fake):
+            return igdb.fetch_game(igdb_id), fake
+
+    def fetch_error(self, records, igdb_id=1942):
+        with self.assertRaises(igdb.IgdbError) as raised:
+            self.fetch(records, igdb_id)
+        return raised.exception
+
+    def test_query_asks_for_that_id_only_with_no_eligibility_clause(self):
+        _, fake = self.fetch([{"id": 1942, "name": "The Witcher 3", "game_type": 0}])
+        [body] = fake.igdb_bodies()
+        lines = body.decode("utf-8").splitlines()
+        self.assertEqual(lines, [igdb.FETCH_FIELDS, "where id = 1942;", "limit 1;"])
+        self.assertNotIn("game_type =", body.decode("utf-8"))
+        for field in ("slug", "summary", "url", "genres.name", "themes.name", "version_parent"):
+            self.assertIn(field, igdb.FETCH_FIELDS)
+        self.assertEqual(fake.igdb_calls[0]["timeout"], igdb.TIMEOUT_SECONDS)
+
+    def test_a_full_record_becomes_details_with_links(self):
+        details, _ = self.fetch(
+            [
+                {
+                    "id": 1942,
+                    "name": "The Witcher 3: Wild Hunt",
+                    "slug": "the-witcher-3-wild-hunt",
+                    "summary": "RPG.",
+                    "first_release_date": 1431993600,
+                    "game_type": 0,
+                    "cover": {"id": 9, "image_id": "co1wyy"},
+                    "url": "https://www.igdb.com/games/the-witcher-3-wild-hunt",
+                    "platforms": [{"id": 6, "name": "PC (Microsoft Windows)"}, {"id": 6}],
+                    "genres": [{"id": 12, "name": "Role-playing (RPG)"}, "junk"],
+                    "themes": [{"id": 17, "name": "Fantasy"}, {"id": True, "name": "Bad"}],
+                }
+            ]
+        )
+        self.assertEqual(details.igdb_id, 1942)
+        self.assertEqual(details.name, "The Witcher 3: Wild Hunt")
+        self.assertEqual(details.slug, "the-witcher-3-wild-hunt")
+        self.assertEqual(details.summary, "RPG.")
+        self.assertEqual(details.first_release_date, date(2015, 5, 19))
+        self.assertEqual(details.game_category, 0)
+        self.assertIsNone(details.version_parent)
+        self.assertEqual(details.cover_image_id, "co1wyy")
+        self.assertEqual(details.igdb_url, "https://www.igdb.com/games/the-witcher-3-wild-hunt")
+        self.assertEqual(details.platforms, (igdb.IgdbNamed(6, "PC (Microsoft Windows)"),))
+        self.assertEqual(details.genres, (igdb.IgdbNamed(12, "Role-playing (RPG)"),))
+        self.assertEqual(details.themes, (igdb.IgdbNamed(17, "Fantasy"),))
+
+    def test_type_and_version_parent_are_passed_through_for_the_save_service(self):
+        cases = [
+            ({"game_type": 3}, 3, None),
+            ({"game_type": 0, "version_parent": 11133}, 0, 11133),
+            ({}, None, None),  # missing type
+            ({"game_type": False}, None, None),  # JSON false is not Main Game
+            ({"game_type": "0"}, None, None),
+            ({"game_type": 15}, 15, None),  # unknown future type, judged later
+        ]
+        for extra, game_type, version_parent in cases:
+            with self.subTest(extra=extra):
+                cache.clear()
+                details, _ = self.fetch([{"id": 1942, "name": "X", **extra}])
+                self.assertEqual(details.game_category, game_type)
+                self.assertIsNot(details.game_category, False)
+                self.assertEqual(details.version_parent, version_parent)
+
+    def test_a_malformed_version_parent_is_refused_rather_than_dropped(self):
+        for bad in ("11133", {"id": 11133}, True, 0, -5):
+            with self.subTest(version_parent=bad):
+                cache.clear()
+                error = self.fetch_error(
+                    [{"id": 1942, "name": "X", "game_type": 0, "version_parent": bad}]
+                )
+                self.assertEqual(error.code, "igdb_unavailable")
+
+    def test_no_matching_record_is_igdb_game_not_found(self):
+        for records in ([], [{"id": 1943, "name": "Some other game"}], ["junk"]):
+            with self.subTest(records=records):
+                cache.clear()
+                self.assertEqual(self.fetch_error(records).code, "igdb_game_not_found")
+
+    def test_failures_map_like_search_with_no_retry_and_no_secrets(self):
+        for label, twitch, igdb_responses, code, igdb_calls in failure_cases():
+            with self.subTest(label):
+                cache.clear()
+                fake = FakeHttp(twitch=twitch, igdb_responses=igdb_responses)
+                with (
+                    CaptureLogs() as logs,
+                    mock.patch("games.igdb.requests.post", side_effect=fake),
+                    self.assertRaises(igdb.IgdbError) as raised,
+                ):
+                    igdb.fetch_game(1942)
+                error = raised.exception
+                self.assertEqual(error.code, code)
+                self.assertEqual(len(fake.igdb_calls), igdb_calls)
+                self.assertIsNone(error.__cause__)
+                for secret in (FAKE_SECRET, FAKE_TOKEN_1, FAKE_TOKEN_2):
+                    for text in [str(error), repr(error), *logs.records]:
+                        self.assertNotIn(secret, text)
+
+    def test_missing_credentials_make_no_request(self):
+        with (
+            override_settings(IGDB_CLIENT_ID="", IGDB_CLIENT_SECRET=""),
+            mock.patch("games.igdb.requests.post") as post,
+            self.assertRaises(igdb.IgdbError) as raised,
+        ):
+            igdb.fetch_game(1942)
+        self.assertEqual(raised.exception.code, "igdb_misconfigured")
+        post.assert_not_called()

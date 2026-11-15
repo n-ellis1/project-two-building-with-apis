@@ -141,7 +141,7 @@ class SavedLinkTests(TestCase):
         for entry in (other_shared_entry, other_only_entry):
             self.assertNotIn(reverse("games:entry_detail", args=[entry.pk]), html)
 
-    def test_saved_lookup_is_one_query_and_unsaved_results_have_no_save_button(self):
+    def test_saved_lookup_is_one_query_and_unsaved_results_get_a_save_form(self):
         me = make_user("me")
         make_entry(me, make_game("Mine", igdb_id=6001))
         returned = fake_games(10, start=6001)
@@ -149,11 +149,19 @@ class SavedLinkTests(TestCase):
         with mock.patch("games.igdb.search_games", return_value=returned):
             self.client.get(SEARCH_URL, {"q": "warm up"})  # session and user queries
             with self.assertNumQueries(3):  # session, user, saved entries
-                response = self.client.get(SEARCH_URL, {"q": "game"})
+                response = self.client.get(SEARCH_URL, {"q": "game", "page": "2"})
 
         self.assertContains(response, 'data-testid="saved-link"', count=1)
-        self.assertNotContains(response, "/search/save/")
-        self.assertNotContains(response, ">Save<")
+        self.assertContains(response, 'data-testid="save-form"', count=9)
+        self.assertNotIn('data-testid="save-form"', result_row(response, 6001))
+        row = result_row(response, 6002)
+        self.assertIn(f'action="{reverse("games:search_save")}"', row)
+        self.assertIn('method="post"', row)
+        self.assertIn("csrfmiddlewaretoken", row)
+        self.assertIn('name="igdb_id" value="6002"', row)
+        self.assertIn('name="q" value="game"', row)
+        self.assertIn('name="page" value="2"', row)
+        self.assertNotIn("hx-post", row)  # an ordinary form, so it can redirect to edit
 
 
 class SearchSetupMixin:

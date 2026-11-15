@@ -264,6 +264,37 @@ Search `star`, pages 1 and 2, three runs:
 - **Decision (user, 2026-11-15, Option 1):** keep the IGDB query and the current search order (no
   `sort`), and record this as a known limitation in the research note (section 5) and the PRD.
 
+### Phase 8: Save a game from search
+
+**Result: Pass (2026-11-15).** Automated checks: all five standard checks pass, 241 tests. The user
+ran the Phase 8 browser checklist with `uv run python manage.py runserver` and their real `.env`, and
+reported that Phase 8 "looked good". The steps weren't reported one by one, so the table records each
+as unverified in the browser (no issue reported), with the automated test covering the same behavior.
+
+| # | Step | Expected | Result | Date |
+|---|---|---|---|---|
+| 1 | `demo_a`: search `Hollow Knight`, click Save, save the edit form | Lands on edit with "Added … to your games."; the game is at the top of My Saved Games | Unverified in the browser (no issue reported). Automated: `NewSaveTests` | 2026-11-15 |
+| 2 | Save in one tab, then submit the stale Save form in a second tab | "Already in your games" on the existing entry; one entry; the search then shows Saved | Unverified in the browser (no issue reported). Automated: `DuplicateSaveTests`, `test_a_repeat_save_returns_the_existing_entry_unchanged` | 2026-11-15 |
+| 3 | Double-click Save on a new result | One entry | Unverified in the browser (no issue reported). Automated: `SimultaneousSaveTests` (real committed race on a second connection) | 2026-11-15 |
+| 4 | Repeatable outage save check, Wi-Fi off and dummy credentials (see [IGDB outage saves](#igdb-outage-saves)) | Stored game saves with no IGDB call; new game shows the message with the My Saved Games link, even though the results can't reload; no Game, link or Entry rows from it | Unverified in the browser (no issue reported). Automated: `OutageSaveCheckTests`, `OutageSaveTests`, `test_the_message_still_shows_when_reloading_the_results_fails_too` | 2026-11-15 |
+| 5 | DevTools: change `igdb_id` to `22439` (Witcher 3 GOTY), then `89841` (DS3 Day One Edition) | "This release can't be saved. Search for the base game or a supported release." | Unverified in the browser (no issue reported). Automated: `test_an_excluded_id_posted_directly_is_refused`, `EligibilityTests` | 2026-11-15 |
+| 6 | GET `/search/save/`; signed-out submit | 405; redirected to login | Unverified in the browser (no issue reported). Automated: `MethodAndAuthTests` | 2026-11-15 |
+
+What Phase 8 added: the save service `games/saving.py` (`save_game`, `SaveResult`, `SaveFailed`), the
+shared eligibility rule `is_eligible()` in `games/models.py`, `fetch_game()` in `games/igdb.py`
+(by ID only, no eligibility clause; the Python rule decides), and the POST-only `/search/save/` view
+with Save forms on unsaved search results.
+
+- **Duplicates:** only an `IntegrityError` can be a duplicate, and only when the requesting user's
+  entry for that game is confirmed after the rollback. Any other database error, or an
+  `IntegrityError` with no such entry, shows only the generic message "Something went wrong while
+  saving this game. Try again." A new Game whose insert collides with another request's is retried
+  once as a stored Game (eligibility rechecked, no second IGDB call).
+- **Saving a game already in your list** returns "Already in your games" before the eligibility check
+  (user decision, 2026-11-15). Other users' new saves of an ineligible stored Game are still refused.
+
+No browser bugs or usability issues were found in Phase 8.
+
 ## Browser bugs and usability fixes (Reflection Question 5)
 
 Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** screenshot, the fix
@@ -466,10 +497,41 @@ region; HTMX loaded locally). Browser Back/Forward needs JavaScript, so it is ch
 
 ## IGDB outage saves
 
-Filled in during Phase 8: the repeatable outage save check (search term, the "existing" and "new"
-games with their IGDB IDs, results of each run).
+The repeatable outage save check from the plan's Phase 8 manual verification, step 4. Phase 12 reruns
+it with the same search.
 
-_Not started (Phase 8)._
+**Procedure**
+
+1. **Setup (IGDB reachable).** Sign in as `demo_b` and search `Dark Souls III`.
+   - **Existing:** Dark Souls III (IGDB 11133), stored by the demo seed and saved only by `demo_a`. It
+     shows Save, not Saved, for `demo_b`.
+   - **New:** a result not in the seed data (suggested: *Ashes of Ariandel*). Read its IGDB ID from the
+     Save form's hidden `igdb_id` in DevTools.
+2. **Confirm before the outage.** In `/admin/` (private window, superuser), 11133 is in Games and the
+   new game's ID isn't.
+3. **Keep the forms.** Leave `demo_b`'s results tab loaded and don't reload it.
+4. **Simulate the outage.** Variant A: turn off Wi-Fi (the dev server keeps running). Variant B:
+   restart the server with `$env:IGDB_CLIENT_ID = "dummy"; $env:IGDB_CLIENT_SECRET = "dummy"` set in
+   the shell (not a different env file, which would change `DJANGO_SECRET_KEY` and sign you out).
+5. **Save the existing game.** Lands on its edit page: Want to Play, not favorite, no IGDB call.
+6. **Save the new game** (Back to the loaded results, no reload). Returns to `/search/?q=Dark+Souls+III`
+   with the outage (A) or configuration (B) message and the My Saved Games link, shown although the
+   results can't reload.
+7. **No partial save.** My Saved Games for `demo_b` shows only Dark Souls III added. In admin, the new
+   game's ID is absent from Games, with no new Platform, Genre or Theme rows.
+8. **Reset.** Restore Wi-Fi, or run `Remove-Item Env:IGDB_CLIENT_ID, Env:IGDB_CLIENT_SECRET` and
+   restart. Delete `demo_b`'s Dark Souls III entry through the confirmation page; the shared Game stays.
+
+**Runs**
+
+| Date | Variant | Search | Existing game | New game | Result |
+|---|---|---|---|---|---|
+| 2026-11-15 | Wi-Fi off and dummy credentials (as listed in the checklist) | `Dark Souls III` (as suggested) | Dark Souls III (11133) | Not recorded (title and IGDB ID weren't reported) | Overall Pass reported by the user ("looked good"); individual steps unverified in the browser |
+
+Automated mirror: `games/tests/test_search_save.py` `OutageSaveCheckTests` renders `demo_b`'s results
+with one stored and one new game, makes the IGDB client fail, and posts both loaded forms: the stored
+game saves with the client uncalled; the new game shows the error and every Game, Platform, Genre,
+Theme, link and Entry count is unchanged.
 
 ## Acceptance criteria sweep
 

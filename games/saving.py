@@ -1,0 +1,155 @@
+"""The one save service: add an IGDB game to a user's list.
+
+Used by the website's Save button and, from Phase 10, by the API's create.
+"""
+
+from dataclasses import dataclass
+
+from django.db import DatabaseError, IntegrityError, transaction
+from django.utils import timezone
+
+from . import igdb
+from .models import Entry, Game, Genre, Platform, Theme, is_eligible
+from .queries import owned_entries
+
+GENERIC_SAVE_MESSAGE = "Something went wrong while saving this game. Try again."
+
+
+class SaveFailed(Exception):
+    """An unexpected failure while saving (a database error, or an integrity error
+    that isn't a confirmed duplicate). Users only ever see `GENERIC_SAVE_MESSAGE`."""
+
+    message = GENERIC_SAVE_MESSAGE
+
+    def __init__(self):
+        super().__init__(self.message)
+
+
+@dataclass(frozen=True)
+class SaveResult:
+    """The user's entry for the game, and whether this call created it
+    (`created=False` means it was already in their games)."""
+
+    entry: Entry
+    created: bool
+
+
+def save_game(user, igdb_id: int) -> SaveResult:
+    """Save IGDB game `igdb_id` to `user`'s list. The owner is always `user`.
+
+    - **Already mine:** returns my existing entry unchanged (`created=False`), before
+      any eligibility check or IGDB call.
+    - **Already stored:** reused with no IGDB call, so it still saves during an outage.
+      If its stored version parent is set or its stored Game Category is off the
+      allowlist, it is refused (`game_category_excluded`), still with no IGDB call.
+    - **New:** fetched from IGDB first. A failed fetch raises `IgdbError`, and an
+      ineligible record raises `game_category_excluded`, both before any database
+      write. The Game, its platform, genre and theme links, and the Entry are then
+      written in one transaction, so a later failure rolls all of them back.
+
+    A failed write always rolls back. Only an `IntegrityError` can be a duplicate, and
+    only if my entry for this game is confirmed after the rollback. Any other
+    database error, or an `IntegrityError` with no such entry, raises `SaveFailed`
+    (a generic, safe message). The one exception: a new Game whose insert collided
+    with another request's is retried once as a stored Game.
+    """
+    existing = _my_entry(user, igdb_id)
+    if existing is not None:
+        return SaveResult(existing, created=False)
+
+    game = Game.objects.filter(igdb_id=igdb_id).first()
+    if game is not None:
+        return _save_stored(user, game)
+
+    details = igdb.fetch_game(igdb_id)  # raises IgdbError; nothing written yet
+    if not is_eligible(details.game_category, details.version_parent):
+        raise igdb.IgdbError("game_category_excluded")
+    return _save_new(user, details)
+
+
+def _my_entry(user, igdb_id: int) -> Entry | None:
+    """The user's own entry for this game, through the owner-scoped helper."""
+    return owned_entries(user).filter(game__igdb_id=igdb_id).first()
+
+
+def _save_stored(user, game: Game) -> SaveResult:
+    # Stored-classification rule: the stored values decide, with no IGDB call.
+    if not is_eligible(game.game_category, game.version_parent):
+        raise igdb.IgdbError("game_category_excluded")
+    try:
+        with transaction.atomic():
+            entry = Entry.objects.create(owner=user, game=game)
+    except IntegrityError:
+        pass  # rolled back; maybe a simultaneous save of mine, judged below
+    except DatabaseError:
+        raise SaveFailed() from None
+    else:
+        return SaveResult(entry, created=True)
+    return _duplicate_or_fail(user, game.igdb_id)
+
+
+def _save_new(user, details: igdb.IgdbGameDetails) -> SaveResult:
+    game_insert_collided = False
+    try:
+        with transaction.atomic():
+            try:
+                game = _insert_game(details)
+            except IntegrityError:
+                game_insert_collided = True
+                raise
+            _link_game(game, details)
+            entry = Entry.objects.create(owner=user, game=game)
+    except IntegrityError:
+        pass  # the Game, its links and the Entry are all rolled back; judged below
+    except DatabaseError:
+        raise SaveFailed() from None  # also rolled back as a whole
+    else:
+        return SaveResult(entry, created=True)
+
+    if game_insert_collided and _my_entry(user, details.igdb_id) is None:
+        # Another request stored this Game first. Reuse it once, as a stored Game
+        # (eligibility rechecked on the stored values, no second IGDB call).
+        stored = Game.objects.filter(igdb_id=details.igdb_id).first()
+        if stored is not None:
+            return _save_stored(user, stored)
+    return _duplicate_or_fail(user, details.igdb_id)
+
+
+def _duplicate_or_fail(user, igdb_id: int) -> SaveResult:
+    """After a rolled-back IntegrityError: a duplicate only if my entry is confirmed."""
+    existing = _my_entry(user, igdb_id)
+    if existing is not None:
+        return SaveResult(existing, created=False)
+    raise SaveFailed()
+
+
+def _insert_game(details: igdb.IgdbGameDetails) -> Game:
+    """The fetched game's row. Call only inside a transaction."""
+    return Game.objects.create(
+        igdb_id=details.igdb_id,
+        name=details.name,
+        slug=details.slug,
+        summary=details.summary,
+        first_release_date=details.first_release_date,
+        game_category=details.game_category,
+        version_parent=details.version_parent,
+        cover_image_id=details.cover_image_id,
+        igdb_url=details.igdb_url,
+        last_fetched_at=timezone.now(),
+    )
+
+
+def _link_game(game: Game, details: igdb.IgdbGameDetails) -> None:
+    """The game's platform, genre and theme links. Call only inside a transaction."""
+    game.platforms.set(_named_items(Platform, details.platforms))
+    game.genres.set(_named_items(Genre, details.genres))
+    game.themes.set(_named_items(Theme, details.themes))
+
+
+def _named_items(model, items):
+    """Rows for IGDB platforms, genres or themes, matched by IGDB ID. Existing rows
+    are reused as stored (names aren't updated here)."""
+    return [
+        model.objects.get_or_create(igdb_id=item.igdb_id, defaults={"name": item.name})[0]
+        for item in items
+    ]

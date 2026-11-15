@@ -34,6 +34,12 @@ SEARCH_FIELDS = (
     "fields name, first_release_date, platforms.name, game_type, version_parent, cover.image_id;"
 )
 
+# Everything the save service stores for one game (and Phase 9 refresh updates).
+FETCH_FIELDS = (
+    "fields name, slug, summary, first_release_date, game_type, version_parent, "
+    "cover.image_id, url, platforms.name, genres.name, themes.name;"
+)
+
 UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 # The PRD's fixed, safe messages. Nothing else from IGDB or Twitch ever reaches a user.
@@ -84,6 +90,36 @@ class IgdbGame:
             return GameCategory(self.game_category).label
         except ValueError:
             return ""
+
+
+@dataclass(frozen=True)
+class IgdbNamed:
+    """A platform, genre or theme as IGDB returns it."""
+
+    igdb_id: int
+    name: str
+
+
+@dataclass(frozen=True)
+class IgdbGameDetails:
+    """One game fetched by ID, with everything the save service stores.
+
+    `game_category` and `version_parent` are passed through as IGDB sent them
+    (None when missing), so the save service can apply the eligibility rule.
+    """
+
+    igdb_id: int
+    name: str
+    slug: str = ""
+    summary: str = ""
+    first_release_date: date | None = None
+    game_category: int | None = None
+    version_parent: int | None = None
+    cover_image_id: str = ""
+    igdb_url: str = ""
+    platforms: tuple[IgdbNamed, ...] = ()
+    genres: tuple[IgdbNamed, ...] = ()
+    themes: tuple[IgdbNamed, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -252,6 +288,72 @@ def _to_game(record) -> IgdbGame | None:
         platforms=names,
         game_category=game_type if isinstance(game_type, int) else None,
         cover_image_id=cover_id if isinstance(cover_id, str) else "",
+    )
+
+
+def build_fetch_query(igdb_id: int) -> str:
+    """One game by ID. Deliberately no eligibility clause: the save service checks the
+    record in Python, so an excluded ID is reported as excluded, not as not found."""
+    return f"{FETCH_FIELDS}\nwhere id = {int(igdb_id)};\nlimit 1;\n"
+
+
+def _named(items, max_length=200) -> tuple[IgdbNamed, ...]:
+    return tuple(
+        IgdbNamed(item["id"], item["name"][:max_length])
+        for item in (items if isinstance(items, list) else [])
+        if isinstance(item, dict)
+        and _is_id(item.get("id"))
+        and isinstance(item.get("name"), str)
+        and item["name"]
+    )
+
+
+def _is_id(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _text(value, max_length=None) -> str:
+    text = value if isinstance(value, str) else ""
+    return text[:max_length] if max_length else text
+
+
+def fetch_game(igdb_id: int) -> IgdbGameDetails:
+    """One game by IGDB ID with everything the save service stores.
+
+    Raises `IgdbError("igdb_game_not_found")` when IGDB has no game with that ID, and
+    the usual codes for timeouts, rate limits, outages and configuration problems.
+    `game_category` and `version_parent` are returned as IGDB sent them (None when
+    missing or malformed); eligibility is the save service's decision.
+    """
+    data = _query(IGDB_GAMES_URL, build_fetch_query(igdb_id))
+    if not isinstance(data, list):
+        raise IgdbError("igdb_unavailable")
+    record = next((r for r in data if isinstance(r, dict) and r.get("id") == int(igdb_id)), None)
+    if record is None:
+        raise IgdbError("igdb_game_not_found")
+    cover = record.get("cover")
+    cover_id = cover.get("image_id") if isinstance(cover, dict) else ""
+    game_type = record.get("game_type")
+    if isinstance(game_type, bool) or not isinstance(game_type, int) or game_type < 0:
+        game_type = None  # missing or malformed: never eligible
+    version_parent = record.get("version_parent")
+    if version_parent is not None and not _is_id(version_parent):
+        # Dropping it would make an edition look eligible, so refuse the response.
+        raise IgdbError("igdb_unavailable")
+    url = _text(record.get("url"), 500)
+    return IgdbGameDetails(
+        igdb_id=record["id"],
+        name=_text(record.get("name"), 255) or "Unknown",
+        slug=_text(record.get("slug"), 255),
+        summary=_text(record.get("summary")),
+        first_release_date=_release_date(record.get("first_release_date")),
+        game_category=game_type,
+        version_parent=version_parent,
+        cover_image_id=_text(cover_id, 100),
+        igdb_url=url if url.startswith("https://") else "",
+        platforms=_named(record.get("platforms")),
+        genres=_named(record.get("genres")),
+        themes=_named(record.get("themes")),
     )
 
 

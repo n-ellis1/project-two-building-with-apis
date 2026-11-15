@@ -28,6 +28,66 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Phase 8: saving games from IGDB search, and the "Popular on IGDB" follow-up design
+
+### Prompts
+1. `/implement` Read CLAUDE.md, prd/video-game-tracker.md, and the Phase 8 section of plans/video-game-tracker.md. Implement Phase 8 only: saving games from IGDB search.
+
+   Follow the approved plan and pause at the required TDD checkpoints. Verify that an eligible game already in SQLite can be saved during an IGDB outage, that a failed import leaves no partial data, and that repeated saves don't create duplicate entries. Apply both eligibility checks to stored and newly fetched games.
+
+   Run the five standard checks and give me a short browser checklist, including how to keep the search results open before simulating an outage. Pause for my manual verification before marking Phase 8 complete, staging, committing, pushing, or starting Phase 9.
+2. I approve all three Phase 8 TDD candidates. Start with outage behavior. Verify that user B can save an eligible game already in SQLite without calling IGDB, and that an outage while fetching a new game leaves the Game, Platform, Genre, Theme, and Entry counts unchanged. Run the focused tests, show me the RED result, and pause before implementing.
+
+   For the later cycles, apply the version_parent and game_type checks on both save paths. Treat an IntegrityError as a duplicate only when the same user's entry for that game is confirmed. Also test that if IGDB succeeds but entry creation fails after new metadata is written, the whole import rolls back and the user sees a safe generic error.
+
+   Keep the remaining view and client tests as proposed, including preserving the search query and page after a failed save.
+3. I approve the Cycle 1 RED result and the proposed interface and error handling. Fetch by IGDB ID alone, then check eligibility in Python before saving. Keep the eligibility clause on search. Update the PRD and CLAUDE.md to reflect that distinction.
+
+   Implement the outage behavior: reuse an eligible game already in SQLite without calling IGDB, and let a failed fetch for a new game exit before any database writes. Keep the planned transaction around the new metadata, links, and entry so a later write failure rolls them back together.
+
+   Rerun the focused test, show me the GREEN result for both save paths, and pause before starting the eligibility cycle.
+4. I accept the Cycle 1 GREEN result. Start Cycle 2 with the eligibility tests for both stored and newly fetched games.
+
+   On each path, test a Main Game record with a version_parent and a record without a version_parent whose game_type is outside the allowlist. Include Bundle, Mod, Pack / Addon, Update, and an unknown future type. Expect game_category_excluded, no new entries or metadata rows, and no IGDB call for a stored game. Keep eligible saves covered as a regression check.
+
+   Run the focused tests, show me the RED result, and pause before implementing the eligibility rule.
+5. I approve the Cycle 2 RED result. Add a missing game_type case on both paths. If the stored field is non-nullable, test the missing-type case on the fetched path and at the eligibility helper without changing the schema.
+
+   Implement one shared eligibility rule: version_parent must be absent and game_type must be on the allowlist. Keep 0 valid for Main Game. Run the check before writing any rows on either path, and return game_category_excluded for ineligible releases.
+
+   Rerun the focused tests, show me the GREEN result, and pause before starting the duplicate and rollback cycle.
+6. I accept the Cycle 2 GREEN result. Start Cycle 3 with tests for a normal repeat save, a simulated IntegrityError where the same user's entry for the game is confirmed, and an IntegrityError where only another user's entry exists. Only a confirmed entry for the requesting user and game should count as a duplicate. Verify that duplicate saves preserve the existing tracking data.
+
+   Also test that a new game's metadata and links have been written inside the transaction when the Entry write fails. After the failure, verify that those writes were rolled back and the service returns the safe generic error.
+
+   Run the focused tests, show me the RED result, and pause before implementing.
+7. I approve the Cycle 3 RED tests, the generic error message, and checking for the user's existing entry before eligibility. A repeat save should return that entry unchanged. New entries must still pass eligibility.
+
+   Implement duplicate handling and rollback. Check for a duplicate after the failed transaction has rolled back, and only return created=False when an entry for the requesting user and the same game is confirmed. Other write failures should produce the generic SaveFailed message.
+
+   For the separate case where another request inserts the same new Game first, retry once only if the Game insert collided and a fresh lookup confirms the same IGDB ID is now stored. Recheck eligibility on the stored Game and reuse it without a second IGDB call. Add the regression test for that case after Cycle 3.
+
+   Rerun the focused tests, show me the GREEN result for all four Cycle 3 cases, and pause before the remaining Phase 8 work.
+8. I accept the Cycle 3 GREEN result. Before finishing Phase 8, check the reported DatabaseError handling. Restrict duplicate recovery to IntegrityError after rollback, and only return created=False if the requesting user's entry for that game is confirmed. Other database errors should raise the generic SaveFailed. Keep the single retry for a confirmed shared Game insert collision. The existing collision regression tests are sufficient.
+
+   Finish fetch_game, the POST-only save view, the Save button, redirects, and messages. Verify that a failed save preserves q and page and that its message still appears if reloading the search results also fails.
+
+   Run all five standard checks and give me a short browser checklist. Include how to open the search results before simulating an IGDB outage, then test saving both an already-stored game and a new game. Stop for my manual verification before marking Phase 8 complete, staging, committing, pushing, or starting Phase 9.
+9. Phase 8 looked good in my browser. Record my overall result in docs/verification.md and leave individual steps unverified where I didn't confirm them separately. Update PROMPTS.md and CLAUDE.md, mark Phase 8 complete in the plan, and show me git status --short and the planned commit message. Pause before staging or committing.
+
+   Add this follow-up to the plan for after the Phase 8 commit and before Phase 9:
+
+   On the blank Search IGDB page, add a horizontally scrollable "Popular on IGDB" row under the search box. Use IGDB PopScore's visits ranking to show up to 10 eligible games in ranked order. Each card should show the game's actual cover art and title, with our existing placeholder for missing or failed covers. Make the cover and title one clickable link.
+
+   Clicking a card should open a detail page inside the tracker by IGDB ID, even if I haven't saved the game. Show a larger cover, summary, release date, and platforms. Give me a Save button that uses the existing save flow, or a link to my own saved entry if I've already saved it. Include a link back to Search IGDB.
+
+   Cache the popularity row and keep the search box usable if the feed is unavailable. Show the row only when there is no search term. Record this design now and wait until Phase 8 is committed before implementing it.
+
+### Summary
+- **Outcome:** Phase 8 built with three approved TDD cycles (outage saves, eligibility on both paths, duplicates and rollback), then the rest normally: the save service `games/saving.py`, `is_eligible()` in `games/models.py`, `igdb.fetch_game()`, the POST-only `/search/save/` view with Save forms on unsaved results, and safe messages with a My Saved Games link. All five standard checks pass (241 tests). The user reported that the browser checklist looked good overall; individual steps are recorded as unverified in the browser. The "Popular on IGDB" row and IGDB game detail page were recorded in the plan as a follow-up before Phase 9, not implemented.
+- **Deviations:** The user chose to fetch by ID without the eligibility clause (Python check decides) and to keep the clause on search; the PRD and CLAUDE.md were updated. The user approved checking the user's own entry before eligibility, and the proposed generic message. The user added requirements beyond the proposal: a missing `game_type` case (fetched path and helper, no schema change), an explicit rollback test after metadata is written, duplicate checks only after rollback, a single retry for a colliding shared Game insert, and (after Cycle 3) restricting duplicate recovery to `IntegrityError` so other database errors are always generic.
+- **Sideways:** The approved Cycle 3 "confirmed duplicate" test inserted the other tab's entry inside our own transaction, so the rollback the user asked for would have erased it; it was moved to a `TransactionTestCase` that commits that write on a second thread (assertions unchanged, re-run RED before implementing). The first `fetch_game` draft silently dropped a malformed `version_parent` (making an edition look eligible) and let a JSON `false` count as Main Game; both were caught on review before tests and fixed (malformed parent → `igdb_unavailable`). The Cycle 2 missing-type subtests and the two collided-Game regression tests passed on their first run, so they were never seen failing. Three new view tests first failed because `assertRedirects` consumed the flash message and one test didn't follow a redirect; the tests were fixed, not the code. Ruff fixed import order and formatting. The outage run's new game title and IGDB ID weren't reported and are recorded as not recorded.
+
 ## 2026-11-15 — Phase 7: IGDB client, live IGDB search page and the Roman-numeral search fallback
 
 ### Prompts
