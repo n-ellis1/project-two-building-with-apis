@@ -1,14 +1,19 @@
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.cache import patch_vary_headers
 from django.views.decorators.http import require_http_methods
 
+from . import igdb
 from .forms import EntryForm, SignupForm
 from .models import Entry
 from .queries import (
+    MAX_SEARCH_LENGTH,
     PAGE_SIZE,
     SORT_LABELS,
     EntryQuery,
@@ -16,6 +21,8 @@ from .queries import (
     owned_entries,
     parse_entry_query,
     parse_page,
+    resolve_saved_search,
+    roman_numeral_variant,
     saved_entries,
     saved_games_url,
     user_platforms_played,
@@ -47,13 +54,21 @@ def saved_games_context(user, query: EntryQuery, page_number: int) -> dict:
     The controls (search box, Status, Platform Played, Favorite, Theme, sort), the
     results, the pager, Clear filters and the detail links all come from `query`
     and the resolved page, so they always agree with each other and with the URL.
+
+    The search term may resolve to its Roman-numeral form ("Dark Souls 3" finds
+    "Dark Souls III") when the typed term matches nothing under the active filters.
+    That is decided on the whole filtered list, before paging, so every page of the
+    same URL runs the same search. The URL, the search box and every link keep the
+    typed term; only the results and the notice use the matched one.
     """
-    paginator = Paginator(saved_entries(user, query), PAGE_SIZE)
+    effective = resolve_saved_search(user, query)
+    paginator = Paginator(saved_entries(user, effective), PAGE_SIZE)
     page_obj = paginator.get_page(page_number)
     number = page_obj.number
     return {
         "page_obj": page_obj,
         "query": query,
+        "matched_q": effective.q if effective.q != query.q else "",
         "has_entries": owned_entries(user).exists(),
         "status_choices": Entry.Status.choices,
         "platform_choices": user_platforms_played(user),
@@ -160,4 +175,82 @@ def entry_delete(request, entry_id):
 
 @login_required
 def search(request):
-    return render(request, "games/search.html")
+    """IGDB search (`q`, `page`). Login is checked first, so signed-out visitors never
+    cause an IGDB call, and a blank search makes no call either.
+
+    One IGDB request per page: 11 asked for, 10 shown, Next only if the 11th came
+    back. Errors are shown apart from "No matches." and "No more results", with the
+    search text kept in the box. HTMX pager requests get only the results region,
+    with the clean URL in `HX-Push-Url`; normal requests and history restores get the
+    full page (the same rules as My Saved Games).
+    """
+    q = " ".join(str(request.GET.get("q", "")).split())[:MAX_SEARCH_LENGTH]
+    page = parse_page(request.GET.get("page"))
+    context = {
+        "q": q,
+        "original_q": "",
+        "page": page,
+        "results": [],
+        "error": None,
+        "previous_url": "",
+        "next_url": "",
+    }
+    if q:
+        try:
+            # The client asks for one extra result; it only tells us Next exists.
+            results = igdb.search_games(q, page)
+            # B2: "Dark Souls 3" finds nothing because IGDB titles spell it "III".
+            # Only an empty page 1 (never an error) gets one Roman-numeral retry.
+            fallback = roman_numeral_variant(q)
+            if not results and page == 1 and fallback:
+                fallback_results = igdb.search_games(fallback, 1)
+                if fallback_results:
+                    # From here on the matched term is the search, so the box, the
+                    # pager and the pushed URL all use it.
+                    context["original_q"], q, results = q, fallback, fallback_results
+        except igdb.IgdbError as error:
+            context["error"] = error.message
+        else:
+            shown = results[: igdb.SEARCH_PAGE_SIZE]
+            context["results"] = with_saved_entries(request.user, shown)
+            # An empty later page offers a page-1 link instead of Previous.
+            if page > 1 and shown:
+                context["previous_url"] = search_url(q, page - 1)
+            if len(results) > igdb.SEARCH_PAGE_SIZE:
+                context["next_url"] = search_url(q, page + 1)
+    context["q"] = q
+    context["first_page_url"] = search_url(q)
+
+    if is_htmx_swap(request):
+        response = render(request, "games/_search_region.html", context)
+        response["HX-Push-Url"] = search_url(q, page)
+    else:
+        response = render(request, "games/search.html", context)
+    patch_vary_headers(response, ["HX-Request", "HX-History-Restore-Request"])
+    return response
+
+
+def with_saved_entries(user, games) -> list[dict]:
+    """Pair each shown result with the user's own entry ID for it, or None.
+
+    One owner-scoped query for the IGDB IDs on this page. Another user's entry for
+    the same game never matches, so their entry IDs can't appear on my page.
+    """
+    saved = dict(
+        owned_entries(user)
+        .filter(game__igdb_id__in=[game.igdb_id for game in games])
+        .values_list("game__igdb_id", "pk")
+    )
+    return [{"game": game, "saved_entry_id": saved.get(game.igdb_id)} for game in games]
+
+
+def search_url(q: str, page: int = 1) -> str:
+    """IGDB search for `q` at `page`, on our own route. Blank values are left out:
+    no `q` for a blank search, and no `page` for page 1."""
+    params = {}
+    if q:
+        params["q"] = q
+        if page > 1:
+            params["page"] = page
+    querystring = f"?{urlencode(params)}" if params else ""
+    return reverse("games:search") + querystring

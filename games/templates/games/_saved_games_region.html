@@ -71,6 +71,11 @@
   </form>
 
   {% if page_obj.paginator.count %}
+    {% if matched_q %}
+      <p class="alert alert-info py-2" data-testid="search-fallback">
+        No matches for “{{ query.q }}”. Showing results for “{{ matched_q }}”.
+      </p>
+    {% endif %}
     <p class="text-body-secondary small mb-2" data-testid="result-summary">
       Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
       · sorted by {{ sort_label }}

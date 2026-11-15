@@ -131,7 +131,7 @@ The live queries run from a one-off script kept in the session scratchpad, which
 - [x] Every game type has a keep or exclude decision and a badge label, and I have approved them.
 - [x] The PRD's open items are updated. No credentials or tokens appear in the note or the PRD. (PROMPTS.md is checked when the session log is written.)
 
-**Result (2026-11-14):** see [docs/research/igdb-game-types.md](../docs/research/igdb-game-types.md). The decisions are recorded under "Game Category (approved in Phase 1)" in the architectural decisions above. A possible IGDB search-ordering issue is recorded as unconfirmed and gets checked in Phase 7.
+**Result (2026-11-14):** see [docs/research/igdb-game-types.md](../docs/research/igdb-game-types.md). The decisions are recorded under "Game Category (approved in Phase 1)" in the architectural decisions above. A possible IGDB search-ordering issue is recorded as unconfirmed and gets checked in Phase 7 (done: see the Phase 7 result).
 
 ### Automated checks
 
@@ -429,14 +429,18 @@ The IGDB client module, built on the verification script's request, timeout and 
 
 ### Acceptance criteria
 
-- [ ] A cached token is reused. A new one is fetched after cache expiry. A 401 triggers exactly one refresh and retry, and a second 401 isn't retried and shows the misconfiguration message.
-- [ ] Timeout, unreachable, 429 and 5xx each show their exact PRD message, with no retry and with the My Saved Games link.
-- [ ] The outgoing query contains exactly the Phase 1 `where` clause, limit 11 and the correct offset.
-- [ ] **IGDB ordering check (live, resolves the unconfirmed ordering issue):** repeating the exact same search returns the same IDs in the same order on page 1 and on page 2, and no ID appears on both pages. The result is recorded in `docs/verification.md` and the verification note. If ordering isn't stable, the difference is written down for my decision before Phase 7 is committed (for example, adding a `sort` to the query).
-- [ ] Next appears only when 11 results came back. The empty-page messages are correct. Errors never show "No matches.".
-- [ ] Saved results link to the current user's entry only (another user's saved game shows as unsaved for me).
-- [ ] Signed-out visitors are redirected to login and IGDB is never called.
-- [ ] Tests check that a fake secret and fake token never appear in responses, messages, log output or cache keys.
+- [x] A cached token is reused. A new one is fetched after cache expiry. A 401 triggers exactly one refresh and retry, and a second 401 isn't retried and shows the misconfiguration message.
+- [x] Timeout, unreachable, 429 and 5xx each show their exact PRD message, with no retry and with the My Saved Games link.
+- [x] The outgoing query contains exactly the Phase 1 `where` clause, limit 11 and the correct offset.
+- [x] **IGDB ordering check (live, resolves the unconfirmed ordering issue):** repeating the exact same search returns the same IDs in the same order on page 1 and on page 2, and no ID appears on both pages. The result is recorded in `docs/verification.md` and the verification note. If ordering isn't stable, the difference is written down for my decision before Phase 7 is committed (for example, adding a `sort` to the query).
+- [x] Next appears only when 11 results came back. The empty-page messages are correct. Errors never show "No matches.".
+- [x] Saved results link to the current user's entry only (another user's saved game shows as unsaved for me).
+- [x] Signed-out visitors are redirected to login and IGDB is never called.
+- [x] Tests check that a fake secret and fake token never appear in responses, messages, log output or cache keys.
+
+**Result (2026-11-15):** all standard checks pass (211 tests). The user ran the browser checklist with live IGDB; individual steps weren't reported one by one, so `docs/verification.md` records them as unverified in the browser (no issue reported) alongside their automated tests. The client is `games/igdb.py`: `search_games(q, page)`, `IgdbError` (`code`, fixed `message`, `retry_after`), the token under the cache key `igdb:access_token` for `expires_in` − 300 seconds. A 401 gets one fresh token and one resend of the same body; a second 401, or any 403, raises `igdb_misconfigured` with no retry (403 rule added by the user). The search page is `games/views.py` `search` with `_search_region.html`, using the same HTMX rules as My Saved Games.
+- **Ordering:** three repeated `star` runs returned identical ordered IDs on pages 1 and 2 with no overlap. Separately, changing `limit` or `offset` changed the order of some results, so a duplicate or skipped result at a page boundary is possible; neither was observed. The user chose to keep the query and order (no `sort`) and record it as a known limitation (research note section 5, PRD).
+- **Browser bugs B2 and B3 (both fixed and retested by the user):** `Dark Souls 3` found nothing on Search IGDB or My Saved Games because titles use "III". The shared rule `roman_numeral_variant()` in `games/queries.py` tries a final standalone 2–9 as a Roman numeral once, only when the typed term finds nothing. Search IGDB does this for an empty page 1 and then uses the matched term for the box and pager. My Saved Games decides it with `resolve_saved_search()` on the whole filtered list before paging and keeps the typed term in the URL and controls. Phase 10's API search must reuse it (noted under Phase 10). The B2 and B3 before and after screenshots are pending reflection evidence.
 
 ### Automated checks
 
@@ -583,6 +587,7 @@ Add DRF and its token app (confirm DRF supports Django 6.1 and Python 3.14 first
 A model viewset on a router at `/api/entries/` with the queryset scoped to the authenticated user:
 
 - **List**: strict `q`, `status`, `platform`, `favorite`, `theme`, `sort` and `page` through the shared query builder. Invalid status, favorite, theme or sort returns 400. A bad or out-of-range page returns 404. Responses include `count`, `next`, `previous` and `results`.
+  - **Search fallback (added in Phase 7, bugs B2/B3):** the `q` search must reuse the website's local fallback, `resolve_saved_search()` in `games/queries.py`: the typed term first, and only if it matches nothing under the active filters, its Roman-numeral form once (`Dark Souls 3` → `Dark Souls III`), decided on the whole filtered list before pagination, from the user's own entries. Add API tests for a typed-term match taking priority, the fallback, and another user's entries staying private.
 - **Create**: through the save service with `igdb_id` and optional tracking fields. The owner comes from the request. Upstream errors return 503 with `{"detail", "code"}` (and Retry-After for rate limits). Not found, excluded and duplicate return 400 with `{"detail", "code"}`.
 - **Retrieve and update**: PATCH merges stored values before the shared validation. PUT resets omitted optional fields. Changing `igdb_id` on update is rejected, and nested game input is ignored.
 - **Delete**: returns 204 and keeps the Game.
@@ -593,7 +598,7 @@ Document example create and PATCH requests and responses in the README.
 ### Acceptance criteria
 
 - [ ] No credentials gives 401. A valid token and a website session both work.
-- [ ] List parameters mean the same as on the website. Invalid values give 400, and bad pages give 404.
+- [ ] List parameters mean the same as on the website, including the Roman-numeral search fallback from Phase 7. Invalid values give 400, and bad pages give 404.
 - [ ] Create sets the owner from the token even if another owner is posted. Each error returns the specified status and body.
 - [ ] PATCH with a finish date before the stored start date gives a 400 field error. Stale-platform rules hold for PATCH and PUT.
 - [ ] PUT resets omitted optional fields. Changing `igdb_id` gives 400.
@@ -717,7 +722,7 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Phase 4: Entry detail page and covers (functional verification complete; B1 screenshots pending)
 - [x] Phase 5: Edit and delete entries
 - [x] Phase 6: Search, filters, Theme, sorts and pagination (no browser issues reported; RQ4 screenshot pending)
-- [ ] Phase 7: IGDB client and IGDB search page
+- [x] Phase 7: IGDB client and IGDB search page (ordering kept as a known limitation; B2 and B3 screenshots pending)
 - [ ] Phase 8: Save a game from search
 - [ ] Phase 9: Refresh from IGDB
 - [ ] Phase 10: Saved-entry REST API

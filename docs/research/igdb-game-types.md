@@ -1,7 +1,7 @@
 # IGDB Game Types: Verification for the Game Category Rules
 
 **Verified:** 2026-11-14 (official docs and live requests the same day)
-**Status:** facts verified. **Keep/exclude allowlist and badge labels approved 2026-11-14** and carried into the PRD's Game Category rules and the plan. One open item: IGDB search ordering is **unconfirmed** until the Phase 7 check (section 5).
+**Status:** facts verified. **Keep/exclude allowlist and badge labels approved 2026-11-14** and carried into the PRD's Game Category rules and the plan. IGDB search ordering was **checked live in Phase 7 (2026-11-15)**: repeated identical searches are stable, but the order of some results depends on `limit` and `offset`; the query and order were kept as they are (section 5).
 **Plan phase:** Phase 1 of [plans/video-game-tracker.md](../../plans/video-game-tracker.md)
 
 ## Summary
@@ -161,7 +161,11 @@ where version_parent = null & game_type = (0,1,2,4,6,7,8,9,10,11,12);
 
 - **Allow-list, not deny-list.** Live, the allow-list returns the same 352,473 games as `version_parent = null & game_type != (3,5,13,14);`, and the same results for all three test searches. The difference is in the future: if IGDB adds a new type, an allow-list leaves it out until it's reviewed (and given a badge), instead of showing it with no label.
 - **One rule in two places.** The save service applies the same rule in Python, both to a newly fetched record and to a Game already stored locally: `version_parent` must be empty and `game_type` must be in the allowed set. That way an excluded ID posted directly is rejected (PRD stories 35 and 98), with the message "This release can't be saved. Search for the base game or a supported release." The search adds the clause to every query, so the "ask for 11, show 10" Next rule stays accurate.
-- **Search ordering may not be stable.** For "Resident Evil 2", the deny-list run and the logically equivalent allow-list run returned the main-game, remake, remaster and port records in a different order. This wasn't tested with byte-identical repeated queries. **Status: unconfirmed.** If ordering isn't stable, a result could repeat or be skipped across page boundaries. Phase 7 settles it by repeating the exact same search and comparing IDs on pages 1 and 2. Record the result here when it's done.
+- **Search ordering (checked live in Phase 7, 2026-11-15).** In Phase 1, the deny-list run and the logically equivalent allow-list run for "Resident Evil 2" returned the main-game, remake, remaster and port records in a different order, so Phase 7 checked ordering with the real client (`games.igdb.search_games`: this `where` clause, `limit 11`, offset (page − 1) × 10). Full record: [docs/verification.md](../verification.md), "Live client ordering check".
+  - **Repeated searches are stable.** Three repeated runs of the same `star` search returned identical ordered IDs on page 1 and on page 2, and none of the 10 IDs shown on page 1 appeared among the 10 shown on page 2.
+  - **Changing `limit` or `offset` changed the order of some results.** Compared with one wide request (offset 0, limit 30), the page requests (limit 11) returned some pairs in the other order: positions 2–3, 11–12 (page 1's hidden 11th result, 17030, came back second on page 2), 19–20, and 27–29 against page 3. The sets of shown IDs per page still matched the wide request's positions 1–10, 11–20 and 21–30.
+  - **Consequence:** a duplicate or skipped result at a page boundary is **possible** if two such results straddle positions 10 and 11. **Neither was observed in this check.** The Next rule is unaffected, because it only counts whether an 11th result came back.
+  - **Decision (user, 2026-11-15):** keep the query and IGDB's relevance order, with no `sort` added, and document this as a known limitation.
 
 ## 6. Decisions carried downstream (approved 2026-11-14)
 

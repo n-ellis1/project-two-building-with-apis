@@ -1,0 +1,68 @@
+{% load game_covers %}
+{% comment %}
+  The swapped region of Search IGDB: messages, results and the pager. HTMX pager
+  requests get only this; everything else gets the full page. Without JavaScript,
+  Previous and Next are ordinary links to the same URLs.
+{% endcomment %}
+<div id="search-region" data-testid="search-region"
+     hx-target="#search-region" hx-swap="outerHTML" hx-push-url="true">
+{% if error %}
+  {# Errors are never shown as "No matches." #}
+  <div class="alert alert-danger" role="alert" data-testid="search-error">
+    {{ error }}
+    <a class="alert-link ms-1" href="{% url 'games:saved_games' %}">Go to My Saved Games</a>
+  </div>
+{% elif results %}
+  {% if original_q %}
+    <p class="alert alert-info" data-testid="search-fallback">
+      No matches for “{{ original_q }}”. Showing results for “{{ q }}”.
+    </p>
+  {% endif %}
+  <ul class="list-group shadow-sm mb-3" data-testid="search-results">
+    {% for row in results %}{% with game=row.game %}
+      <li class="list-group-item py-3 d-flex gap-3 align-items-start" data-testid="search-result" data-igdb-id="{{ game.igdb_id }}">
+        <div class="flex-shrink-0">{% cover_img game "small" %}</div>
+        <div class="flex-grow-1">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <span class="fw-semibold">{{ game.name }}</span>
+            {% if game.category_badge %}
+              <span class="badge text-bg-info" data-testid="category-badge">{{ game.category_badge }}</span>
+            {% endif %}
+          </div>
+          <div class="small text-body-secondary">
+            Released {{ game.first_release_date|date:"M j, Y"|default:"date unknown" }}
+            · {{ game.platforms|join:", "|default:"Platforms unknown" }}
+          </div>
+        </div>
+        {# Unsaved results get a Save button in Phase 8. #}
+        {% if row.saved_entry_id %}
+          <a class="btn btn-outline-success btn-sm flex-shrink-0 align-self-center" data-testid="saved-link"
+             href="{% url 'games:entry_detail' row.saved_entry_id %}">Saved</a>
+        {% endif %}
+      </li>
+    {% endwith %}{% endfor %}
+  </ul>
+{% elif q and page == 1 %}
+  <div class="card shadow-sm" data-testid="no-matches">
+    <div class="card-body text-center py-5"><p class="lead mb-0">No matches.</p></div>
+  </div>
+{% elif q %}
+  <div class="card shadow-sm" data-testid="no-more-results">
+    <div class="card-body text-center py-5">
+      <p class="lead mb-2">No more results</p>
+      <a href="{{ first_page_url }}" hx-get="{{ first_page_url }}">Back to page 1</a>
+    </div>
+  </div>
+{% endif %}
+{% if previous_url or next_url %}
+  <nav aria-label="Search result pages" class="d-flex align-items-center gap-3">
+    {% if previous_url %}
+      <a class="btn btn-outline-primary btn-sm" href="{{ previous_url }}" hx-get="{{ previous_url }}" rel="prev">Previous</a>
+    {% endif %}
+    <span class="small text-body-secondary" data-testid="page-label">Page {{ page }}</span>
+    {% if next_url %}
+      <a class="btn btn-outline-primary btn-sm" href="{{ next_url }}" hx-get="{{ next_url }}" rel="next">Next</a>
+    {% endif %}
+  </nav>
+{% endif %}
+</div>

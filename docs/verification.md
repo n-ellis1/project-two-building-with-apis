@@ -199,6 +199,71 @@ No browser bugs or usability issues were reported in Phase 6.
 **Screenshots:** none present. Checked on 2026-11-15: `docs/verification/screenshots/` contains only
 `.gitkeep`. The Reflection Question 4 Back-step screenshot is **pending** (see below).
 
+### Phase 7: IGDB client and IGDB search page
+
+**Result: Pass (2026-11-15), with reflection evidence pending:** the B2 and B3 before and after
+screenshots. Automated checks: all five standard checks pass, 211 tests.
+
+The user ran the Phase 7 browser checklist with live IGDB and reported that it "looked good" apart
+from one search issue, B2 (`Dark Souls 3` found nothing on Search IGDB). B3 (the same on My Saved
+Games) followed. Both were fixed and the user confirmed both fixes in the browser. The checklist
+steps weren't reported one by one, so the table records them as unverified in the browser (no issue
+reported), each with the automated test covering the same behavior.
+
+| # | Step | Expected | Result | Date |
+|---|---|---|---|---|
+| 1 | Search `The Witcher 3` as `demo_a` | Base game (Saved) and Blood and Wine (Expansion); no GOTY Edition, bundle, Remastered update or Redux mod | Unverified in the browser (no issue reported). Automated: `SearchQueryBodyTests`, `test_results_show_cover_title_release_date_platforms_and_badge` | 2026-11-15 |
+| 2 | Search `Dark Souls III`, `Resident Evil 2` | No bundles, editions, mods or packs; Port, Remake, Remaster badges | Unverified in the browser (no issue reported). Same tests as step 1 | 2026-11-15 |
+| 3 | Search `Dark Souls 3` | Finds Dark Souls III | **Failed, then fixed: B2.** Retest **Pass** | 2026-11-15 |
+| 4 | Broad search `star`, Next and Previous | Region swaps, URL updates, query kept; Next only when more | Unverified in the browser (no issue reported). Automated: `SearchPagerTests`, `SearchHtmxTests`. Ordering: see the live client check below | 2026-11-15 |
+| 5 | Back/Forward; Local Storage | URL, results and page agree; no stored results | Unverified in the browser (no issue reported). Browser only; `hx-history="false"` checked by `test_full_page_opts_out_of_htmx_history_outside_the_swapped_region` | 2026-11-15 |
+| 6 | `page=abc`, `page=500`, nonsense search | Page 1; "No more results" with a page-1 link; "No matches." | Unverified in the browser (no issue reported). Automated: `SearchPageStateTests` | 2026-11-15 |
+| 7 | JavaScript disabled, Next and Previous | Full pages, same results | Unverified in the browser (no issue reported). Automated: `test_pager_links_work_without_javascript_and_swap_with_htmx` | 2026-11-15 |
+| 8 | `demo_b` searches `Dark Souls III` | Shows as unsaved | Unverified in the browser (no issue reported). Automated: `SavedLinkTests` | 2026-11-15 |
+| 9 | Dummy IGDB credentials | Misconfiguration message with a working My Saved Games link | Unverified in the browser (no issue reported). Automated: `SearchErrorTests`, `FailureMappingTests` | 2026-11-15 |
+| 10 | Signed out, `/search/?q=zelda` | Redirected to login; no IGDB call | Unverified in the browser (no issue reported). Automated: `test_signed_out_visitors_are_redirected_and_igdb_is_never_called` | 2026-11-15 |
+| 11 | My Saved Games: search `Dark Souls 3` | Finds Dark Souls III | **Failed, then fixed: B3.** Retest **Pass** | 2026-11-15 |
+
+Browser bugs found: [B2](#b2-phase-7-dark-souls-3-finds-nothing-while-dark-souls-iii-finds-the-game)
+and [B3](#b3-phase-7-my-saved-games-search-for-dark-souls-3-finds-nothing).
+
+#### Live client ordering check (2026-11-15)
+
+Run from a throwaway scratchpad script (not committed) through the Phase 7 client
+(`games.igdb.search_games`, the approved `where` clause, `limit 11`, offsets 0 and 10) with the
+user's real `.env`. It printed IGDB IDs and error codes only; no credentials or tokens were printed.
+Requests were sent one at a time with a 0.5-second pause.
+
+Search `star`, pages 1 and 2, three runs:
+
+| Run | Page 1 (offset 0, 11 returned; the 11th only signals Next) | Page 2 (offset 10, 11 returned) |
+|---|---|---|
+| 1 | 119305, 305275, 45529, 137, 158, 71780, 1232, 64921, 194604, 262535, *(17030)* | 84839, 17030, 303280, 69258, 136107, 285677, 10204, 298942, 39822, 18902, *(67202)* |
+| 2 | identical to run 1 | identical to run 1 |
+| 3 | identical to run 1 | identical to run 1 |
+
+- **Repeated runs:** the three repeated `star` runs returned identical ordered IDs on page 1 and on
+  page 2, with no overlap: none of the 10 IDs shown on page 1 appears among the 10 shown on page 2.
+- **Separately, changing `limit` or `offset` changed the order of some results.** Page 1's hidden
+  11th result (17030) is page 2's *second* result, not its first. Two follow-up requests through the
+  same client show the pattern:
+
+  | Positions | One wide request (offset 0, limit 30) | Page requests (limit 11) |
+  |---|---|---|
+  | 2–3 | 45529, 305275 | page 1: 305275, 45529 |
+  | 11–12 | 84839, 17030 | page 1's 11th: 17030; page 2: 84839, 17030 |
+  | 19–20 | 18902, 39822 | page 2: 39822, 18902 |
+  | 27–29 | 399219, 475, 2681 | page 3 (offset 20): 2681, 399219, 475 |
+
+  The **sets** of shown IDs still match exactly (page 1 = wide positions 1–10, page 2 = 11–20,
+  page 3 = 21–30). Results that IGDB apparently ranks equally are ordered differently depending on
+  `limit` and `offset`.
+- **Consequence:** a duplicate or skipped result at a page boundary is **possible** if two such
+  results straddle positions 10 and 11. **Neither was observed in this check.** The Next rule is
+  unaffected (it only counts whether an 11th result came back).
+- **Decision (user, 2026-11-15, Option 1):** keep the IGDB query and the current search order (no
+  `sort`), and record this as a known limitation in the research note (section 5) and the PRD.
+
 ## Browser bugs and usability fixes (Reflection Question 5)
 
 Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** screenshot, the fix
@@ -250,6 +315,98 @@ Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** 
   from page 2 returns to page 2; direct entry returns to page 1; empty, `1`, `0`, `-1`, `abc`, `2.5`,
   an outside URL and injected markup all return to page 1; page-1 links carry no page; another user's
   entry with `?page=2` is still 404. All five standard checks pass (82 tests).
+
+### B2 (Phase 7): "Dark Souls 3" finds nothing, while "Dark Souls III" finds the game
+
+- **Found:** 2026-11-15, during Phase 7 manual verification (live IGDB, the user's real `.env`).
+- **Reproduction:**
+  1. `uv run python manage.py runserver`, sign in (any user), open **Search IGDB**.
+  2. Search `Dark Souls 3` (URL `/search/?q=Dark+Souls+3`).
+  3. Then search `Dark Souls III` (URL `/search/?q=Dark+Souls+III`).
+- **Expected:** step 2 finds Dark Souls III, because players commonly type the sequel number as a
+  digit.
+- **Actual:** step 2 shows "No matches."; step 3 finds Dark Souls III. IGDB's `search` matches the
+  title's own spelling, and the title uses the Roman numeral.
+- **Before screenshot:** **pending reflection evidence.** Not captured before the fix (checked
+  2026-11-15: not in the repo). Expected as `verification/screenshots/phase7-b2-before.png` (step 2's
+  "No matches." page, no secrets visible). Captured now, it would be a recreation of the old
+  behavior and labelled **reproduction**.
+- **Agreed fix (user, 2026-11-15):** the exact search always runs first. Only when page 1 of the
+  exact search returns no results (not an error) and the text ends in a standalone number from 2
+  to 9, the search is tried once more with that number as a Roman numeral (`Dark Souls 3` →
+  `Dark Souls III`). If that finds results, the page says which term matched, and the pager links
+  use the matched term so Next doesn't jump back to the original search. Both requests carry the
+  eligibility `where` clause. If the original request errors, the existing error message is shown
+  and no second request is made.
+- **Fix:** `roman_numeral_variant()` (`games/queries.py:229`, moved there from `games/views.py`
+  in B3 so My Saved Games shares it) turns a final standalone 2–9 into its Roman numeral. The
+  `search` view (`games/views.py:177`) runs the exact search first and, only for an empty page 1
+  with such a variant, makes one more request (`games/views.py:204`). When that
+  finds results, the matched term becomes the search for the box, the pager links and
+  `HX-Push-Url`, and the notice "No matches for “…”. Showing results for “…”." is shown
+  (`games/templates/games/_search_region.html:17`). Both requests go through
+  `igdb.search_games`, so both carry the eligibility clause. An error on the exact search is shown
+  with no second request.
+- **After screenshot:** **pending reflection evidence.** Expected as
+  `verification/screenshots/phase7-b2-after.png` (checked 2026-11-15: not in the repo).
+- **Retest after the fix (2026-11-15):** **Pass.** The user repeated the steps and confirmed that
+  `Dark Souls 3` now works on Search IGDB. (The user confirmed the outcome; the individual retest
+  checklist steps weren't reported one by one.)
+- **Tests:** `RomanNumeralFallbackTests` and `RomanNumeralFallbackRequestTests` in
+  `games/tests/test_search.py`: fallback once with the notice and the matched term in the box; an
+  exact match makes no fallback request; Next and Previous use the matched term, and following Next
+  searches it directly; HTMX pushes the matched term; an exact-search error shows the error with no
+  fallback; a fallback error shows the error with the original text kept; neither term matching
+  shows "No matches."; no fallback for page 2, `zelda`, `Halo 1`, `Final Fantasy 10`, `Doom3`, `3`
+  or a number that isn't last; each digit 2–9 maps correctly; and, through the real client with HTTP
+  mocked, both requests carry the eligibility clause, `limit 11` and `offset 0`. All five standard
+  checks pass (203 tests).
+
+### B3 (Phase 7): My Saved Games search for "Dark Souls 3" finds nothing
+
+- **Found:** 2026-11-15, by the user while retesting B2, on My Saved Games (SQLite only).
+- **Reproduction:**
+  1. `uv run python manage.py runserver`, sign in as `demo_a` (who has Dark Souls III saved).
+  2. On My Saved Games (`/games/`), search `Dark Souls 3` and press Enter.
+- **Expected:** Dark Souls III is listed, the same as Search IGDB after B2.
+- **Actual:** "No saved games match your search and filters." The search is a case-insensitive
+  substring match, and the saved title spells the number as "III".
+- **Before screenshot:** **pending reflection evidence.** The user's `/games/` screenshot of step 2
+  is the before evidence (user's choice), but it isn't in the repo yet (checked 2026-11-15).
+  Expected as `verification/screenshots/phase7-b3-before.png`.
+- **Agreed fix (user, 2026-11-15):** reuse the B2 trailing-number rule. Search the typed term first;
+  only if it has no matches under the active filters, try the Roman-numeral form once. Decide this
+  on the whole filtered list before paging, so an empty or out-of-range page can't switch the search.
+  Stay in SQLite and scoped to the signed-in user's entries, keep filters, sorting and paging, and say
+  which term matched.
+- **Fix:**
+  - The rule moved to `games/queries.py` so both pages share it: `roman_numeral_variant()`
+    (`:229`) and the new `resolve_saved_search()` (`:242`), which tries the typed term under the
+    active filters and, only if it matches nothing, the Roman-numeral form, each with `.exists()`
+    on the user's own filtered entries. Search IGDB imports the same function.
+  - `saved_games_context()` paginates the resolved query (`games/views.py:64`). The URL, the
+    search box, the pager, Clear filters, detail links and `HX-Push-Url` keep the **typed** term, so
+    URL, controls and results still agree on every request (Reflection Question 4) and every page of
+    the same URL resolves the same way.
+  - The notice "No matches for “…”. Showing results for “…”." is shown above the results
+    (`games/templates/games/_saved_games_region.html:75`).
+- **After screenshot:** **pending reflection evidence.** Expected as
+  `verification/screenshots/phase7-b3-after.png` (checked 2026-11-15: not in the repo).
+- **Retest after the fix (2026-11-15):** **Pass.** The user retested `Dark Souls 3` on My Saved Games
+  and confirmed the fix works. (The user confirmed the outcome; the filter, return-link, Back/Forward
+  and `demo_b` steps of the retest checklist weren't reported one by one, so they rely on the tests
+  listed below.)
+- **Tests:** `games/tests/test_saved_games_search_fallback.py`: a typed-term match takes priority
+  (a notes match beats a Roman-numeral title); the fallback finds Dark Souls III with the notice and
+  the typed term kept in the box and detail links; another user's notes and entries neither decide the
+  fallback nor appear; the fallback is decided under the active Status filter; paging and the Title Z
+  to A sort keep the typed term, page 2 and an out-of-range page show the same fallback search; HTMX
+  pushes the typed term; neither term matching shows the normal empty state; terms without a final
+  2–9 never switch. IGDB is patched to fail if called.
+- **Other title searches checked:** Search IGDB uses the same rule (B2). The Django admin search
+  (`search_fields` in `games/admin.py`) is a superuser debugging tool for finding exact rows, so it
+  was left unchanged. `scripts/igdb_search.py` stays unchanged as the Phase 1 baseline. The Phase 10
+  API search is recorded in the plan to reuse `resolve_saved_search()`.
 
 ## Back/Forward query state (Reflection Question 4)
 

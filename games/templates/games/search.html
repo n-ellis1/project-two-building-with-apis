@@ -1,11 +1,24 @@
 {% extends "games/base.html" %}
 {% block title %}Search IGDB{% endblock %}
 {% block content %}
-<h1 class="h3 mb-4">Search IGDB</h1>
-<div class="card shadow-sm">
-  <div class="card-body py-4">
-    <p class="mb-2">Game search isn't available yet.</p>
-    <a href="{% url 'games:saved_games' %}">Back to My Saved Games</a>
-  </div>
+{% comment %}
+  hx-history="false": HTMX never snapshots this page into localStorage, because the
+  "Saved" links reveal the user's own entry IDs. Back and Forward then always miss
+  HTMX's cache and request the URL with HX-History-Restore-Request, which the view
+  answers with this full page. The attribute sits outside the swapped region.
+{% endcomment %}
+<div hx-history="false" data-testid="search-page">
+  <h1 class="h3 mb-4">Search IGDB</h1>
+  {% url 'games:search' as search_url %}
+  {# Ordinary form navigation. No page field, so a new search always starts on page 1. #}
+  <form method="get" action="{{ search_url }}" role="search" class="card card-body shadow-sm mb-3">
+    <label for="igdb-q" class="form-label small mb-1">Game title</label>
+    <div class="d-flex gap-2">
+      <input type="search" id="igdb-q" name="q" value="{{ q }}" class="form-control"
+             placeholder="For example, The Witcher 3" maxlength="200">
+      <button type="submit" class="btn btn-primary">Search</button>
+    </div>
+  </form>
+  {% include "games/_search_region.html" %}
 </div>
 {% endblock %}

@@ -28,6 +28,92 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Phase 7: IGDB client, live IGDB search page and the Roman-numeral search fallback
+
+### Prompts
+1. `/implement` Read CLAUDE.md, prd/video-game-tracker.md, the Phase 7 section of plans/video-game-tracker.md, and docs/research/igdb-game-types.md. Implement Phase 7 only: the server-side IGDB client and live search page.
+
+   Follow the approved plan and pause for TDD review at the required checkpoints. Apply the approved eligibility filter before pagination. Cover token reuse and a single retry after an IGDB 401, safe error messages, Previous and Next links, and owner-scoped Saved links. Keep live API calls out of automated tests and credentials out of output.
+
+   Run the five standard checks and give me a short browser checklist. Include the Witcher 3, Dark Souls III, and Resident Evil 2 checks, and repeat the exact same search to compare entry IDs and order across pages 1 and 2. If ordering is unstable, report what you observed so we can decide how to handle it.
+
+   Pause for my manual verification before marking Phase 7 complete, staging, committing, pushing, or starting Phase 8.
+2. I approve all three Phase 7 TDD candidates. Start with token reuse and the single 401 retry. Use fake credentials and mocked HTTP. Verify that two searches reuse one Twitch token, that an IGDB 401 triggers one refresh and retries the original query with the new token, and that a second 401 raises igdb_misconfigured with no further retry. Show me the focused RED result and pause before implementing.
+
+   For the later pager cycle, check that page 2 sends the approved eligibility clause, limit 11, and offset 10. Test both 10 and 11 returned results: display 10 in either case, show Previous on page 2, and show Next only when the 11th result exists.
+
+   Keep the owner-scoped Saved-link cycle and the proposed error regression tests. Keep the live ordering check separate from the automated tests.
+3. I approve the three Cycle 1 RED tests. Implement token caching and retry the original IGDB query exactly once after a 401, using a fresh token. A second 401 should raise igdb_misconfigured.
+
+   One correction to the implementation plan: a 403 should raise the safe igdb_misconfigured error immediately, with no token refresh or retry. Add a regression test for that behavior. Cache the token for slightly less than expires_in and keep token values out of logs and errors.
+
+   Rerun the focused client tests, show me the GREEN result, and pause before the pager cycle.
+4. I accept the Cycle 1 GREEN result. Start the pagination cycle. Test that page 2 sends the approved eligibility clause, limit 11, and offset 10 to IGDB.
+
+   With mocked responses of exactly 10 and exactly 11 results, verify that the page displays 10 results in both cases, shows Previous on page 2, and shows Next only when IGDB returns an 11th result. Check that the pager links preserve the search term and point to the correct pages.
+
+   Run the focused tests, show me the RED result, and pause before implementing the pagination behavior. Keep the live search-order check for manual verification.
+5. I approve the Cycle 2 RED result and the pager tests as written. Display only the first 10 results. On page 2, show Previous in both cases and show Next only when IGDB returns an 11th result. Keep the URL-encoded search term in both links and omit the page parameter for page 1.
+
+   Rerun the focused client query and pager tests, show me the GREEN result, and pause before starting the owner-scoped Saved-link cycle. Keep the live ordering check for manual verification.
+6. I accept the Cycle 2 GREEN result. Start Cycle 3 with the owner-scoped Saved-link test. Include one game saved by both users and one saved only by the other user. Verify that the shared game shows Saved and links to the signed-in user's own entry ID. The other user's game should show as unsaved and must not expose their entry ID or detail URL.
+
+   Mock IGDB at the client boundary. Run the focused test, show me the RED result, and pause before implementing the Saved links.
+7. I approve the Cycle 3 RED result and the test as written. Build the Saved links with one owner-scoped query for the IGDB IDs displayed on the current page. Each Saved link should point to the signed-in user's own entry. Leave unsaved results without a Save button until Phase 8.
+
+   Rerun the focused test and show me the GREEN result, including the assertions that neither of the other user's entry URLs appears. Pause before finishing the remaining Phase 7 work.
+8. I accept the Cycle 3 GREEN result. Finish the remaining Phase 7 work as proposed: empty and error states, client and credential-safety tests, search view tests, and the HTMX pager.
+
+   Use the same HTMX rules as My Saved Games: ordinary swaps return the region with a clean HX-Push-Url, history restores return the full page, and private Saved links stay out of HTMX's local history cache. Keep normal pager links working without JavaScript.
+
+   Run all five standard checks and give me a short browser checklist. Include The Witcher 3, Dark Souls III, and Resident Evil 2, plus a broad search that reaches page 2. For that search, repeat the same query on both pages and compare IGDB IDs and their order. If you find unstable order or overlap, report what happened before changing the sort.
+
+   Stop for my browser verification before marking Phase 7 complete, staging, committing, pushing, or starting Phase 8.
+9. The rest of Phase 7 looked good in my browser. I found one search issue: "Dark Souls 3" shows No matches, while "Dark Souls III" finds the game.
+
+   Record the reproduction steps in docs/verification.md. Keep the exact search first. If page 1 returns no matches and the title ends in a standalone number from 2 through 9, try the Roman numeral version once. If that finds results, show which term matched and use that same term for pagination so Next doesn't jump back to the original search. Keep the eligibility filter on both requests. If the original request errors, show the existing error message.
+
+   Add focused tests for the fallback, a successful exact search that makes no fallback request, and pagination using the matched term. Run the standard checks and pause for my browser retest before closing Phase 7.
+10. I confirmed that Dark Souls 3 now works on Search IGDB. Add the same fallback to My Saved Games. Reuse the existing trailing-number conversion rule. Search the original term first, and if it has no matches under the active filters, try the Roman numeral version once. Check for matches before pagination so an empty or out-of-range page doesn't trigger a different search.
+
+    Keep the search in SQLite and scoped to the signed-in user's entries. Preserve filters, sorting, and pagination, and show which term matched. Add tests for an original match taking priority, a Roman numeral fallback, and another user's entry staying private.
+
+    Check for any other game-title search that already exists and use the same rule there where applicable. Record in the plan that the saved-games API search should reuse the local fallback when it's built.
+
+    Run the standard checks and pause for my browser retest. Use my /games/ screenshot as the before evidence for the saved-games issue.
+11. I retested Dark Souls 3 in My Saved Games and confirmed the fix works. I also confirmed it works in Search IGDB. Record those browser results in docs/verification.md and keep any missing screenshots marked pending.
+
+    Run the remaining live star ordering check using the Phase 7 IGDB client. Compare the ordered IDs on pages 1 and 2 across three runs and check for overlap. Keep credentials out of the output. Record the results as a live client check. If you find unstable ordering or overlap, report it before changing the sort.
+
+    If ordering is stable, update the research note, PROMPTS.md, CLAUDE.md, and the plan to close Phase 7. Run the five standard checks and show me git status --short and the planned commit message. Stop before staging, committing, pushing, or starting Phase 8.
+12. I choose Option 1. Keep the IGDB query and current search order. In the research note, PRD, and verification log, record that the three repeated star runs returned identical ordered IDs on pages 1 and 2 with no overlap. Separately record that changing the limit or offset changed the order of some results. Describe a duplicate or skipped result at a page boundary as possible, with neither observed in this check.
+
+    Update PROMPTS.md and CLAUDE.md, mark Phase 7 complete in the plan, and keep the missing screenshots marked as pending reflection evidence. Rerun the five standard checks and show me git status --short and the planned commit message. Stop before staging, committing, pushing, or starting Phase 8.
+
+### Summary
+- **Outcome:**
+  - **TDD selection:** I proposed three behaviors (token reuse with a single 401 retry, the outgoing query plus the pager rule, owner-scoped Saved links). The user approved all three and specified the cases. Each cycle paused after RED and after GREEN.
+  - **Cycle 1, token:** scaffolded `games/igdb.py` (`IgdbError`, the PRD `MESSAGES`, query building, basic requests) without caching or retry. RED: 2 assertion failures (2 Twitch calls instead of 1; no refresh after a 401) and 1 error, the `IgdbError` raised by the first 401, which is the behavior under test rather than missing scaffolding. GREEN: the token cached under `igdb:access_token` for `expires_in` − 300 seconds; a 401 deletes it, fetches one fresh token and resends the same body once; a second 401 raises `igdb_misconfigured`. The user added the 403 rule (immediate `igdb_misconfigured`, no refresh) with its regression test; I added cache-expiry and cache-key tests.
+  - **Cycle 2, pager:** the query-body test (eligibility clause, `limit 11`, `offset 10`) passed straight away because Cycle 1's scaffolding had built the query; I flagged it as a regression guard before running. RED on the page half: the 11th result was displayed and there was no pager. GREEN: show 10, Previous when page > 1, Next only for an 11th result, links from `search_url(q, page)` with page 1 left out.
+  - **Cycle 3, Saved links:** RED: no Saved link. GREEN: `with_saved_entries()`, one `owned_entries(user)` query for the IGDB IDs on the page. A temporary mutation to an unscoped `Entry.objects` made the test fail (the shared row linked to the other user's entry), showing the no-leak assertions bite.
+  - **Remaining work:** "No matches." and "No more results"; the full client error table (timeout, unreachable, 429 with only a valid `Retry-After` kept, 5xx, other 4xx, bad JSON, Twitch rejection, missing credentials with no request); secret-leak tests with a fake secret and tokens planted in failure responses and exception text, checked in errors, chained exceptions, all log records, cache keys and pages; search view tests; the HTMX pager with the My Saved Games rules and `hx-history="false"`.
+  - **B2:** the user found `Dark Souls 3` returned "No matches." on Search IGDB. Recorded first, then fixed: on an empty page 1 only (never after an error), one retry with a final standalone 2–9 as a Roman numeral; the matched term then drives the box, pager and push URL, with a notice. 10 focused tests. The user confirmed the fix in the browser.
+  - **B3:** the user asked for the same on My Saved Games. The rule moved to `games/queries.py`; `resolve_saved_search()` decides it with `.exists()` on the user's whole filtered list before paging, and the URL and controls keep the typed term. 8 focused tests. The other title searches (Django admin, `scripts/igdb_search.py`) were left unchanged with reasons; Phase 10 in the plan now requires the API search to reuse the fallback. The user confirmed the fix in the browser.
+  - **Ordering:** a scratchpad script through the real client (IDs only) ran `star` pages 1 and 2 three times: identical ordered IDs, no overlap. Page 1's hidden 11th result came back second on page 2, so two follow-up requests (one 30-result window, page 3) showed that some equally ranked results swap order with `limit` and `offset`, while each page's set of IDs still matched. Reported before any change; the user chose Option 1 (keep the query and order, document a possible but unobserved boundary duplicate or skip). Recorded in the research note, the PRD and `docs/verification.md`.
+  - **Close:** Phase 7 marked complete in the plan; CLAUDE.md gained the IGDB client, search page and fallback conventions. All five standard checks pass with 211 tests (153 before the phase). The B2 and B3 before and after screenshots are pending reflection evidence. Nothing staged, committed or pushed; Phase 8 not started.
+- **Deviations:**
+  - **User corrections and additions:** the 403 rule; the exact 10-vs-11 pager cases; the Saved-link test design (one shared and one other-only game); the Roman-numeral fallback on both pages, decided before pagination on My Saved Games; the plan note for the Phase 10 API; Option 1 for ordering.
+  - **My design choice the user accepted:** on My Saved Games the URL and search box keep the typed term (so URL, controls and results agree for Reflection Question 4), unlike Search IGDB, which switches to the matched term as the user specified.
+  - **Left unchanged after the "other title searches" check:** the Django admin search and the Phase 1 baseline script.
+  - **Unrequested additions:** search text trimmed and capped at 200 characters on Search IGDB; an empty later page shows a page-1 link instead of Previous; a 429 from Twitch maps to `igdb_rate_limited`; a token without a usable `expires_in` is used but not cached.
+- **Sideways:**
+  - **Wrong assertion:** the first secret-leak test required `__suppress_context__` on every error, which is only set by `raise … from None`. 14 subtests failed; I changed it to "no cause, and any context suppressed" and said so.
+  - **Over-strict case:** I assumed a full-width `２` page value should fall back to page 1; the shared `parse_page` reads it as 2 (a valid number), so I dropped the case rather than change the helper.
+  - **Test setups:** a pre-B2 test relied on "the witcher 3" returning nothing, which the fallback then retried; it got one result so it still tests trimming. In a B3 privacy test, deleting my only entry produced the "no saved games" state instead of the empty-search state; fixed by adding an unrelated entry.
+  - **Ruff:** long lines and formatting in the new tests, a long message line, and `zip()` without `strict=` were fixed before the checks were reported.
+  - **Screenshots:** the B2 fix landed before a before screenshot existed, so one captured later would be a reproduction. No screenshot files exist yet.
+  - No credentials, tokens or `.env` contents were printed, logged or written. The live scripts printed IGDB IDs and error codes only and stay in the session scratchpad.
+
 ## 2026-11-15 — Phase 6: saved-games search, filters, Theme, sorts and HTMX pagination
 
 ### Prompts

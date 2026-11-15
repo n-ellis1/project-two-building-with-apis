@@ -10,7 +10,8 @@ Controls, pager links, Clear filters and detail return links are all rendered fr
 same `EntryQuery`, so they can never disagree with the results.
 """
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
 from urllib.parse import urlencode
 
 from django.db.models import F, Q
@@ -210,6 +211,48 @@ def saved_entries(user, query: EntryQuery = EntryQuery()):
         .prefetch_related("game__platforms")
         .order_by(*ORDERINGS.get(query.sort, DEFAULT_ORDERING))
     )
+
+
+ROMAN_NUMERALS = {
+    "2": "II",
+    "3": "III",
+    "4": "IV",
+    "5": "V",
+    "6": "VI",
+    "7": "VII",
+    "8": "VIII",
+    "9": "IX",
+}
+TRAILING_NUMBER = re.compile(r"^(.*\S)\s+([2-9])$")
+
+
+def roman_numeral_variant(q: str) -> str:
+    """`q` with a final standalone 2–9 as a Roman numeral ("Dark Souls 3" -> "Dark Souls III"),
+    or "" when the text doesn't end that way.
+
+    The one trailing-number rule, used by Search IGDB (an empty page 1 retries once)
+    and by My Saved Games through `resolve_saved_search()`.
+    """
+    match = TRAILING_NUMBER.match(q)
+    if not match:
+        return ""
+    return f"{match.group(1)} {ROMAN_NUMERALS[match.group(2)]}"
+
+
+def resolve_saved_search(user, query: EntryQuery) -> EntryQuery:
+    """The query whose search actually runs on My Saved Games.
+
+    The typed term wins whenever it matches anything under the active filters. Only
+    when it matches nothing, and it ends in a standalone 2–9, is the Roman-numeral
+    form tried once; it is used if it matches. Both checks run on the user's whole
+    filtered list in SQLite, never on a page, so an empty or out-of-range page can't
+    switch the search. Every check starts from the user's own entries.
+    """
+    variant = roman_numeral_variant(query.q)
+    if not variant or saved_entries(user, query).exists():
+        return query
+    fallback = replace(query, q=variant)
+    return fallback if saved_entries(user, fallback).exists() else query
 
 
 def saved_games_url(query: EntryQuery = EntryQuery(), page: int = 1) -> str:
