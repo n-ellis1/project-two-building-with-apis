@@ -2,7 +2,9 @@
 
 from itertools import count
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.test import Client
 from django.utils import timezone
 
 from games.models import Entry, Game, Platform
@@ -28,3 +30,16 @@ def make_game(name: str = "Test Game", platforms=(), **fields) -> Game:
 
 def make_entry(owner, game=None, **fields) -> Entry:
     return Entry.objects.create(owner=owner, game=game or make_game(), **fields)
+
+
+def csrf_client(user, token_page: str) -> tuple[Client, str]:
+    """A signed-in client that enforces CSRF, plus a valid token for it.
+
+    `token_page` is any page the user can open that renders `{% csrf_token %}`,
+    so the CSRF cookie gets set.
+    """
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(user)
+    response = client.get(token_page)
+    assert response.status_code == 200, response.status_code
+    return client, client.cookies[settings.CSRF_COOKIE_NAME].value

@@ -1,10 +1,12 @@
+from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_http_methods
 
-from .forms import SignupForm
+from .forms import EntryForm, SignupForm
 from .queries import PAGE_SIZE, get_owned_entry_or_404, parse_page, saved_entries
 
 
@@ -58,6 +60,41 @@ def entry_detail(request, entry_id):
             "saved_games_return_url": saved_games_url(parse_page(request.GET.get("page"))),
         },
     )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def entry_edit(request, entry_id):
+    """Edit one of my entries' tracking fields. Anyone else's entry ID is a 404."""
+    entry = get_owned_entry_or_404(request.user, entry_id)
+    if request.method == "POST":
+        form = EntryForm(request.POST, instance=entry)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Saved your changes to {entry.game.name}.")
+            return redirect("games:entry_detail", entry_id=entry.pk)
+    else:
+        form = EntryForm(instance=entry)
+    return render(
+        request, "games/entry_edit.html", {"form": form, "entry": entry, "game": entry.game}
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def entry_delete(request, entry_id):
+    """GET only shows the confirmation; a POST (CSRF-checked by middleware) removes the entry.
+
+    Both methods go through the owner-scoped lookup, so anyone else's entry is a 404.
+    Deleting an entry never deletes the shared Game or other users' entries.
+    """
+    entry = get_owned_entry_or_404(request.user, entry_id)
+    if request.method == "POST":
+        game_name = entry.game.name
+        entry.delete()
+        messages.success(request, f"Removed {game_name} from My Games.")
+        return redirect("games:saved_games")
+    return render(request, "games/entry_confirm_delete.html", {"entry": entry, "game": entry.game})
 
 
 @login_required

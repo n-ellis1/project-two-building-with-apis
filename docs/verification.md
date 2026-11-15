@@ -113,6 +113,58 @@ placeholder alone) has no automated test, because the stack has no JavaScript en
 are its verification. A deliberately unrelated broken image wasn't tested; the temporary test page
 for it was skipped by the user's choice.
 
+### Phase 5: Edit and delete entries
+
+**Result: Pass (2026-11-15).** Automated checks: all five standard checks pass, 113 tests. Manual
+steps run by the user in the browser with `uv run python manage.py runserver`, signed in as the
+seeded demo users (password from `DEMO_PASSWORD`, value not recorded). The user reported: "editing
+and Cancel, date and hours validation, keeping an unchanged stale platform and rejecting an unlisted
+replacement, cross-user edit and delete 404s, and confirmed deletion that left the other user's
+Witcher 3 entry intact." Steps the report didn't name are marked unverified. Entry IDs are from the
+local seeded database before the deletion step: `demo_a` Alien: Isolation = 7, Dark Souls III: The
+Ringed City = 13, The Witcher 3 = 15; `demo_b` The Witcher 3 = 16, Skyrim = 18 (the seeded stale
+platform: "Nintendo Switch", no longer listed for the game), Celeste = 23.
+
+| # | Step | Expected | Result | Date |
+|---|---|---|---|---|
+| A1–A3 | `demo_a`: Edit `/games/13/`, set Playing, favorite, rating 8, a platform, dates, 12.5 hours and notes, save | Back on detail with "Saved your changes to …"; every value shown | Pass ("editing") | 2026-11-15 |
+| A4 | Set rating to "Not rated" and platform to "Not set", save | Both show "Not set" | Unverified in the browser (not separately reported). Automated: `test_blank_fields_clear_rating_favorite_platform_dates_and_hours` | 2026-11-15 |
+| A5 | Edit, then Cancel | Back on detail, nothing changed | Pass ("editing and Cancel") | 2026-11-15 |
+| B1 | Finish date before start date | "Finish date can't be before the start date." under Finish date; nothing saved | Pass | 2026-11-15 |
+| B2 | Hours played `-1` | "Ensure this value is greater than or equal to 0."; nothing saved | Pass | 2026-11-15 |
+| B3 | Blank start date with a finish date, status Completed | Saves | Unverified in the browser (not separately reported). Automated: `test_either_date_may_be_blank_for_any_status`, `test_finish_date_may_not_be_before_the_start_date` | 2026-11-15 |
+| C1–C2 | `demo_b`: `/games/18/edit/` (Skyrim), change only the notes | Stale "Nintendo Switch (no longer listed for this game)" selected; save works and keeps it | Pass | 2026-11-15 |
+| C3 | Change an option's value to `Nintendo 64` in DevTools and save | "Choose one of this game's platforms, or leave it blank."; entry unchanged | Pass | 2026-11-15 |
+| C4 | Optional: switch to a listed platform, edit again | Stale option gone | Unverified in the browser (optional, not reported). Automated: `test_once_changed_to_a_current_platform_the_stale_value_is_no_longer_allowed` | 2026-11-15 |
+| E1 | `demo_b`: open `/games/7/edit/` and `/games/7/delete/` (GET) | 404 with no game title | Pass ("cross-user edit and delete 404s") | 2026-11-15 |
+| E2 | `demo_b`: the same URLs as form POSTs with B's valid CSRF token (form action changed in DevTools); then check `demo_a`'s `/games/7/` | 404; A's entry unchanged | Unverified in the browser (not separately confirmed). Automated: `test_another_users_entry_returns_404_for_a_csrf_valid_post_and_is_unchanged` in both `test_entry_edit.py` and `test_entry_delete.py` | 2026-11-15 |
+| D1 | `demo_b`: Remove on `/games/16/` (The Witcher 3) | Confirmation names the game and says status, rating, notes and hours played will be deleted | Pass ("confirmed deletion") | 2026-11-15 |
+| D2 | Cancel on the confirmation page | Back on `/games/16/`, entry still exists | Unverified in the browser (not separately confirmed; "Cancel" was reported with editing). Automated: `test_cancel_links_to_the_entry_detail_page`, `test_get_only_shows_the_confirmation_page` | 2026-11-15 |
+| D3 | Remove from My Games | My Saved Games with "Removed The Witcher 3: Wild Hunt from My Games."; entry gone | Pass ("confirmed deletion") | 2026-11-15 |
+| D4 | `demo_a`: `/games/15/` | A's Witcher 3 entry and the shared game details still exist | Pass | 2026-11-15 |
+
+The user's report paired "Cancel" with editing and didn't separately confirm the delete page's
+Cancel (D2) or the DevTools cross-user POSTs (E2), so those stay unverified in the browser and rely
+on the automated tests named in their rows. `demo_b`'s Witcher 3 entry was deleted in D3; rerunning
+`seed_demo` recreates it with a new entry ID.
+
+Automated coverage for the same behavior: `games/tests/test_validation.py` (shared validation:
+blank, listed and unchanged-stale platforms accepted, an unlisted replacement rejected on
+`platform_played`; missing, single, equal and later dates accepted, finish before start rejected on
+`finish_date`), `games/tests/test_entry_edit.py` (form fields and platform dropdown with the stale
+option, every field saves and shows on detail, all five statuses, clearing fields, either date
+blank, finish-before-start, negative hours and out-of-range ratings rejected with nothing saved,
+stale platform kept while notes change, unlisted replacement rejected, stale value not allowed once
+replaced, cross-user GET 404 and CSRF-valid POST 404 with the entry unchanged, missing ID 404,
+signed-out redirect) and `games/tests/test_entry_delete.py` (owner POST removes only their entry,
+keeps the Game and the other user's entry, redirects with the message; GET only confirms; Cancel
+link to detail; Edit and Remove links on detail; POST without a CSRF token is 403 and deletes
+nothing; other methods 405; signed-out redirect; cross-user GET 404 and CSRF-valid POST 404 with the
+entry and Game unchanged; missing ID 404). In the cross-user POST tests, the same token then works on
+the user's own entry, so each 404 comes from the owner check, not CSRF.
+
+No browser bugs or usability issues were found in Phase 5.
+
 ## Browser bugs and usability fixes (Reflection Question 5)
 
 Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** screenshot, the fix

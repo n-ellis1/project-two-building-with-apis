@@ -1,0 +1,15 @@
+{% extends "games/base.html" %}
+{% block title %}Remove {{ game.name }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+    <h1 class="h3 mb-3">Remove {{ game.name }}?</h1>
+    <p>This removes <strong>{{ game.name }}</strong> from My Games. Your status, rating, notes and hours played for it will be deleted.</p>
+    <form method="post" action="{% url 'games:entry_delete' entry.pk %}" class="d-flex flex-wrap gap-2">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">Remove from My Games</button>
+      <a href="{% url 'games:entry_detail' entry.pk %}" class="btn btn-outline-secondary" data-testid="cancel-delete">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -53,6 +53,11 @@
       <dd class="col-sm-8">{{ entry.created_at|date:"F j, Y" }}</dd>
     </dl>
 
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      <a href="{% url 'games:entry_edit' entry.pk %}" class="btn btn-primary" data-testid="edit-entry">Edit</a>
+      <a href="{% url 'games:entry_delete' entry.pk %}" class="btn btn-outline-danger" data-testid="remove-entry">Remove</a>
+    </div>
+
     <p class="small text-body-secondary mt-4 mb-0" data-testid="igdb-attribution">
       {% if game.igdb_url %}<a href="{{ game.igdb_url }}" rel="noopener">Data from IGDB</a>{% else %}Data from IGDB{% endif %}
       · last refreshed {{ game.last_fetched_at|date:"F j, Y, g:i a" }}

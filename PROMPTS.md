@@ -28,6 +28,63 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Phase 5: shared validation, entry editing and delete confirmation
+
+### Prompts
+1. `/implement` Read CLAUDE.md, prd/video-game-tracker.md, and the Phase 5 section of plans/video-game-tracker.md. Implement Phase 5 only: editing saved entries with shared validation and deleting entries with a confirmation page.
+
+   Follow the approved plan and pause at the required TDD checkpoints. Verify that users can edit and delete only their own entries, that an unchanged stale platform can be kept when editing other fields, and that deleting an entry keeps the shared Game and other users' entries.
+
+   Run the five standard checks and give me the exact browser steps to verify editing, validation, Cancel, confirmed deletion, and cross-user 404s. Stop for my manual verification before marking Phase 5 complete, staging, committing, pushing, or starting Phase 6.
+2. I approve all three Phase 5 TDD candidates. Start with the platform validation test, show me the expected RED result, and pause before implementing it.
+
+   For platform validation, cover blank, a currently listed platform, an unchanged stale value, and an invalid replacement. For date validation, cover missing dates, equal dates, and a finish date before the start date. Make sure the error is attached to the finish-date field.
+
+   For deletion, create two users' entries for the same Game and verify that the owner's POST removes only their entry, preserves the shared Game and the other entry, and redirects with the confirmation message. Keep the planned regression tests for edit, GET confirmation, Cancel, and cross-user GET and POST requests returning 404.
+3. I approve the Cycle 1 RED result and the error message as written. Implement the platform validation so it accepts blank, a currently listed platform, or the unchanged stored value, even if that value is stale. Reject any other value with the error attached to platform_played.
+
+   Rerun the focused validation test, show me the GREEN result, and pause before starting the date-validation cycle.
+4. I accept the Cycle 1 GREEN result. Keep exact platform-name matching. Start Cycle 2 by writing the finish-date validation test. Cover both dates missing, only one date present, equal dates, a finish date after the start date, and a finish date before the start date. Only the last case should fail validation, with the error attached to finished_on.
+
+   Run the focused test, show me the RED result, and pause before implementing the date rule.
+5. I approve the Cycle 2 RED result. Keep start_date and finish_date, and use the proposed error message attached to finish_date. Implement the rule so either date may be blank, equal dates are allowed, and a finish date before the start date is rejected.
+
+   Rerun the focused validation tests, show me the GREEN result for both the platform and date rules, and pause before starting the deletion cycle.
+6. I accept the Cycle 2 GREEN result. Start the deletion cycle by writing the test for an owner's POST to delete their entry. Create two users with entries for the same Game. After the POST, verify that only the requesting user's entry is gone, the shared Game and the other user's entry still exist, and the response redirects to My Saved Games with the confirmation message.
+
+   Run the focused test, show me the RED result, and pause before implementing deletion.
+7. I approve the deletion RED result and the proposed confirmation message. Implement the owner-scoped, CSRF-protected POST so it deletes only the requesting user's entry, preserves the shared Game and the other user's entry, and redirects to My Saved Games with the confirmation message. Keep GET read-only for the confirmation page.
+
+   Rerun the focused deletion test. Confirm that the redirect, visible message, and all database assertions pass, then show me the GREEN result. Pause before continuing with the remaining Phase 5 work.
+8. I accept the deletion GREEN result. Finish Phase 5: build the edit form and view with shared validation, add Edit and Remove links to the detail page, and add the planned regression tests.
+
+   Verify that someone can edit their notes while keeping an unchanged stale platform, but cannot change it to an unlisted platform. Verify that delete GET only shows the confirmation page, Cancel returns to the detail page, and a POST without a CSRF token returns 403 without deleting anything. For cross-user POST checks, use a valid CSRF token and confirm both edit and delete return 404 without changing the entry.
+
+   Run all five standard checks and give me exact browser steps and demo entries to use for editing, validation, Cancel, confirmed deletion, and cross-user access. Stop for my manual verification before marking Phase 5 complete, staging, committing, pushing, or starting Phase 6.
+9. Phase 5 passed my browser checks: editing and Cancel, date and hours validation, keeping an unchanged stale platform and rejecting an unlisted replacement, cross-user edit and delete 404s, and confirmed deletion that left the other user's Witcher 3 entry intact.
+
+   Record the results in docs/verification.md and PROMPTS.md. Mark Phase 5 complete in the plan and update CLAUDE.md. Run the five standard checks again, then show me the results, git status --short, and the planned commit message. Pause before staging, committing, pushing, or starting Phase 6.
+
+### Summary
+- **Outcome:**
+  - **TDD selection:** I proposed three behaviors (platform validation, date validation, owner-only delete POST); the user approved all three and specified the cases for each. Every cycle paused after RED and after GREEN as the `/tdd` skill describes.
+  - **Cycle 1, platform validation:** new `games/validation.py` with `validate_tracking(game, values, *, stored_platform_played="")`, raising Django's `ValidationError` keyed by field so DRF can reuse it in Phase 10. RED: `ValidationError not raised` for the unlisted replacement (the empty scaffold accepted everything). GREEN: blank, a listed platform, or the unchanged stored value (even stale) pass; anything else gets "Choose one of this game's platforms, or leave it blank." on `platform_played`. The user chose exact (case-sensitive) name matching.
+  - **Cycle 2, dates:** RED: `ValidationError not raised` for finish before start. GREEN: "Finish date can't be before the start date." on `finish_date`; blank dates and equal dates pass.
+  - **Cycle 3, delete POST:** RED: the scaffold view returned 200 instead of redirecting. GREEN: `entry_delete` (GET and POST only, owner-scoped for both) deletes only the owner's entry, keeps the shared Game and the other user's entry, and redirects to My Saved Games with "Removed <game> from My Games." The confirmation page template was written in this step because GET needed it.
+  - **Rest of the phase:** `EntryForm` (ModelForm with the `BootstrapFormMixin`, a rating dropdown, and platform played as a text field shown as a dropdown so the shared validation decides which values are allowed), `/games/<id>/edit/`, Edit and Remove buttons on detail, checkbox and select styling in the shared form partial, and a `csrf_client()` test helper. Regression tests cover the edit page, every field, all statuses, the validation errors with nothing saved, the stale-platform rules, delete GET, Cancel, CSRF 403 with nothing deleted, 405 for other methods, signed-out redirects, and cross-user GET and CSRF-valid POST 404s for edit and delete with the entry unchanged. All five standard checks pass with 113 tests (82 before the phase).
+  - **Manual checks:** the user reported that editing and Cancel, date and hours validation, the stale-platform rules, cross-user edit and delete 404s, and confirmed deletion (with `demo_a`'s Witcher 3 entry intact) all passed. Recorded in `docs/verification.md`; steps the report didn't name are marked unverified. Phase 5 is marked complete in the plan, and CLAUDE.md gained the shared-validation convention and the `csrf_client` helper. Nothing staged, committed or pushed; Phase 6 not started.
+- **Deviations:**
+  - **Field name:** prompt 4 asked for the error on `finished_on`, but the model field has been `finish_date` since Phase 3. I used `finish_date` and flagged it at the RED pause instead of renaming the field; the user kept `start_date` and `finish_date` in prompt 5.
+  - **Messages chosen by me and approved:** the platform and date error messages and the delete confirmation message. "Saved your changes to <game>." for edits was my choice and wasn't separately reviewed.
+  - **Additions beyond the prompts:** a 405 test for other methods on delete, out-of-range rating and clear-all-fields tests, and a check in each cross-user POST test that the same CSRF token works on the user's own entry (proving the 404 isn't a hidden CSRF failure).
+- **Sideways:**
+  - **Wrong stale entry named:** in the Cycle 1 RED report I said the test mirrored `demo_a`'s Resident Evil 2 "PlayStation" entry as the seeded stale platform. A database check before the browser steps showed that entry isn't stale (the game lists PlayStation); the seeded stale platform is `demo_b`'s Skyrim ("Nintendo Switch"). I corrected it in the browser steps. The test itself was unaffected because it builds its own data.
+  - **One test was wrong, not the code:** the edit page test expected the "Not rated" option without `selected`; fixed mechanically.
+  - **Stray attribute:** declaring platform played with `max_length` put a `maxlength` attribute on the `<select>`; removed (the model still enforces 200 characters).
+  - **Ruff:** the first full run found five long lines and five files needing formatting, including a missing space my edit left in `games/urls.py`. `ruff format` on the changed files fixed all of them, and the rerun passed.
+  - **Log insert:** my first attempt to add this entry failed because the anchor text's indentation didn't match the file's template block; it was inserted above the Phase 4 heading instead.
+  - No credentials or password values were printed, logged or written to files. The entry-ID lookup printed only usernames, IDs, titles and platforms.
+
 ## 2026-11-15 — Phase 4: covers, cover fallback, entry detail page and the B1 return-link fix
 
 Phase 4 started in an earlier session that produced Cycle 1 (the cover URL builder and its test)

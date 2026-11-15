@@ -301,11 +301,13 @@ The shared validation function (finish date on or after start date when both are
 
 ### Acceptance criteria
 
-- [ ] All five statuses, favorite, rating (blank or 1–10), notes, platform, dates and hours save and display.
-- [ ] Finish before start gives a form error. Either date may be blank for any status. Negative hours are rejected.
-- [ ] A platform not on the game (and not the stored value) is rejected. An entry with a stale stored platform can still have its notes edited without changing the platform. Changing it later requires a current platform or blank.
-- [ ] Delete GET only confirms. POST removes the entry, keeps the Game and other users' entries, and shows the message.
-- [ ] Another user's entry ID returns 404 for edit GET/POST and delete GET/POST, and their entry is unchanged.
+- [x] All five statuses, favorite, rating (blank or 1–10), notes, platform, dates and hours save and display.
+- [x] Finish before start gives a form error. Either date may be blank for any status. Negative hours are rejected.
+- [x] A platform not on the game (and not the stored value) is rejected. An entry with a stale stored platform can still have its notes edited without changing the platform. Changing it later requires a current platform or blank.
+- [x] Delete GET only confirms. POST removes the entry, keeps the Game and other users' entries, and shows the message.
+- [x] Another user's entry ID returns 404 for edit GET/POST and delete GET/POST, and their entry is unchanged.
+
+**Result (2026-11-15):** all standard checks pass (113 tests), and the manual steps passed (see [docs/verification.md](../docs/verification.md)). The shared validation is `validate_tracking` in `games/validation.py`. It raises Django's `ValidationError` keyed by field (`platform_played`, `finish_date`), which DRF converts in Phase 10; the API must merge stored values before calling it. The edit form is `EntryForm` in `games/forms.py`. The seeded stale platform is `demo_b`'s Skyrim ("Nintendo Switch"). Messages: "Saved your changes to <game>." and "Removed <game> from My Games."
 
 ### Automated checks
 
@@ -711,7 +713,7 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Phase 2: Project skeleton, accounts and site layout
 - [x] Phase 3: Models, admin, demo seed and basic My Saved Games
 - [x] Phase 4: Entry detail page and covers (functional verification complete; B1 screenshots pending)
-- [ ] Phase 5: Edit and delete entries
+- [x] Phase 5: Edit and delete entries
 - [ ] Phase 6: Search, filters, Theme, sorts and pagination
 - [ ] Phase 7: IGDB client and IGDB search page
 - [ ] Phase 8: Save a game from search
