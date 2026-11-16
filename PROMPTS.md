@@ -28,6 +28,62 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Phase 9: Refresh from IGDB with throttling and safe reclassification
+
+### Prompts
+1. `/implement` Read CLAUDE.md, prd/video-game-tracker.md, and the Phase 9 section of plans/video-game-tracker.md. Implement Phase 9 only: manually refreshing a saved game's metadata from IGDB.
+
+   Follow the approved plan and pause at the required TDD checkpoints. Preserve existing entries and tracking data if a release becomes ineligible or a saved platform becomes stale. Verify that a failed refresh leaves stored data intact and that another user can't trigger a refresh through someone else's entry.
+
+   Run the five standard checks and give me a short browser checklist. Stop for my manual verification before marking Phase 9 complete, staging, committing, pushing, or starting Phase 10.
+2. I approve all three Phase 9 TDD behaviors and the proposed design. Use the nullable game_category migration so a refresh can store a missing game type, preserve existing entries, and block new saves under the existing eligibility rule. Keep existing saved-platform values and use the validated list state for the redirect.
+
+   Use this throttle message: "A refresh was attempted for this game in the last 10 minutes. Try again later." Apply the throttle per game across users, after checking ownership and before calling IGDB.
+
+   Start with the failed-refresh cycle. Test that each listed IGDB failure leaves the Game fields, relationship links, last-refreshed time, and all users' tracking data unchanged, and that the response shows the agreed safe message. Run the focused tests, show me the RED result, and pause before implementing.
+3. I approve the Cycle 1 RED test as written. Implement the failed-refresh path so it attempts the IGDB fetch once, shows the agreed safe message and appropriate link, and redirects back to the saved entry without changing the Game, relationships, last-refreshed time, or either user's tracking data.
+
+   Keep the exact timestamp comparison in the database snapshot. If the rendered time differs because of Django's timezone or formatting settings, adjust only the display assertion.
+
+   Rerun the focused test, confirm all six failure cases pass, and pause before starting the throttle cycle.
+4. I accept the Cycle 1 GREEN result. Start Cycle 2 with the throttle test. Have user A attempt a refresh that fails, then have user B refresh the same game through their own entry within 10 minutes. Verify B sees the agreed throttle message and IGDB is not called again. Verify that a different game can still be refreshed and that the original game can be retried after 10 minutes. Use a controlled clock so the test doesn't wait in real time.
+
+   Run the focused test, show me the RED result, and pause before implementing the throttle.
+5. I approve the Cycle 2 RED test as written. Implement the throttle with cache.add() using the IGDB game ID as the key and a 600-second timeout. Check entry ownership before setting the key. If the key already exists, show the agreed throttle message and redirect to the user's own detail page without calling IGDB. Keep the key after a failed refresh so the cooldown counts attempts.
+
+   Rerun the focused refresh tests and show me the GREEN result for the cross-user throttle, the different game, and the retry after expiry. Pause before starting Cycle 3.
+6. I accept the Cycle 2 GREEN result. Start Cycle 3. Test that a successful refresh can make a game ineligible in three ways: a version parent appears, the game type moves outside the allowlist, or IGDB supplies no game type.
+
+   In each case, verify that the new classification is stored, both users' existing entries and tracking data stay intact, and a third user's attempt to save the game is rejected without calling IGDB again.
+
+   Run the focused tests, show me the RED result, and pause before implementing the successful refresh.
+7. I approve the Cycle 3 RED test as written. Implement the successful refresh. Fetch from IGDB before opening the write transaction, then update the shared Game metadata, relationship links, and last-refreshed timestamp together in one atomic transaction. Store both classification fields, including a missing game type, and leave all users' entries and tracking fields unchanged.
+
+   Rerun the focused refresh tests. Show me the GREEN result for all three reclassification cases, including that a third user's save is refused without an IGDB call. Confirm the failure and throttle cycles still pass, then pause before the remaining Phase 9 work.
+8. I accept the Cycle 3 GREEN result. Finish Phase 9 as proposed. Add the CSRF-protected Refresh button and the stale-platform warning. Keep the stored platform selected so users can still edit their notes without losing it.
+
+   Add the remaining regression tests: a successful refresh updates metadata, relationships, and the timestamp together; a database failure after writes begin rolls everything back; an owner's GET returns 405; and another user's POST with valid CSRF returns 404 without calling IGDB or creating a throttle key. Verify that the redirect preserves the validated saved-list search, filters, sort, and page.
+
+   Run all five standard checks and give me a short browser checklist. Include a successful refresh, an immediate retry showing the cooldown, the stale-platform warning, and returning to the same saved-list view. Stop for my manual verification before marking Phase 9 complete, staging, committing, pushing, or starting Phase 10.
+9. I completed the Phase 9 browser walkthrough and everything worked as expected. Record my overall result in docs/verification.md. Record the stale-platform warning and notes edit, successful refresh and updated timestamp, immediate cooldown, return to the same saved-list view, and cross-user cooldown as covered by the walkthrough. Leave the optional outage check unverified in the browser unless I separately confirm it.
+
+   Update CLAUDE.md and PROMPTS.md, mark Phase 9 complete in the plan, and rerun the five standard checks. Show me the results, git status --short, and the planned commit message. Pause before staging, committing, pushing, or starting Phase 10.
+
+### Summary
+- **Outcome:** Phase 9 built and verified in the browser (the optional outage step wasn't confirmed in the browser).
+  - **Three approved TDD cycles**, each RED on an assertion before any logic:
+    - **Failed refresh:** all six IGDB failure codes leave the Game, its links, the refresh time and both users' entries unchanged, with the fixed message (link for all but `igdb_game_not_found`).
+    - **Throttle:** `cache.add` on `igdb:refresh_attempt:<igdb_id>` for 600 seconds, after the owner check and before IGDB, kept after failures; tested across users on a controlled cache clock (`CacheClock`).
+    - **Reclassification:** a version parent, an excluded type or a missing type is stored; entries are kept; a third user's save is refused with no IGDB call.
+  - **Built normally:** `saving.refresh_game()` (fetch first, then one transaction, `RefreshFailed` on database errors), the CSRF-protected Refresh button, the stale-platform warning, the validated list-state redirect, migration `0002_game_category_nullable`, and regression tests for success, rollback, 405, a CSRF-valid cross-user 404 and the redirect. 275 tests.
+- **Deviations:** the user chose the throttle message wording ("A refresh was attempted for this game in the last 10 minutes. Try again later.") instead of the proposed one, and specified the throttle mechanics (`cache.add`, IGDB ID key, 600 seconds, after ownership). The nullable `game_category` migration was proposed by the assistant and approved. No follow-up questions were asked.
+- **Sideways:**
+  - The Cycle 2 test first failed after the throttle was in place because user A's step-1 message was never displayed and reappeared later; fixed mechanically by loading the detail page after step 1 (noted, assertions unchanged).
+  - The assistant twice added something pointless and reverted it in the same step (a placeholder test with an unused import, and a stray comment).
+  - One import edit missed because the earlier edit had left the imports out of order; re-read and fixed.
+  - `ruff format --check` flagged the generated migration and the new test file; formatted and rechecked.
+  - Finding the seeded stale-platform entry for the checklist took a few throwaway inspection commands (`demo_b`, *Skyrim*, Nintendo Switch).
+
 ## 2026-11-15 — Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page
 
 ### Prompts

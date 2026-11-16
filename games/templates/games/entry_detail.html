@@ -40,7 +40,14 @@
       <dt class="col-sm-4">Rating</dt>
       <dd class="col-sm-8">{% if entry.rating %}{{ entry.rating }}/10{% else %}Not set{% endif %}</dd>
       <dt class="col-sm-4">Platform played</dt>
-      <dd class="col-sm-8">{{ entry.platform_played|default:"Not set" }}</dd>
+      <dd class="col-sm-8">
+        {{ entry.platform_played|default:"Not set" }}
+        {% if platform_played_stale %}
+          <div class="alert alert-warning small py-2 mt-2 mb-0" role="status" data-testid="stale-platform-warning">
+            IGDB no longer lists {{ entry.platform_played }} for this game. Your choice is kept. If you change it, pick a listed platform or leave it blank.
+          </div>
+        {% endif %}
+      </dd>
       <dt class="col-sm-4">Start date</dt>
       <dd class="col-sm-8">{{ entry.start_date|date:"F j, Y"|default:"Not set" }}</dd>
       <dt class="col-sm-4">Finish date</dt>
@@ -58,10 +65,16 @@
       <a href="{% url 'games:entry_delete' entry.pk %}" class="btn btn-outline-danger" data-testid="remove-entry">Remove</a>
     </div>
 
-    <p class="small text-body-secondary mt-4 mb-0" data-testid="igdb-attribution">
-      {% if game.igdb_url %}<a href="{{ game.igdb_url }}" rel="noopener">Data from IGDB</a>{% else %}Data from IGDB{% endif %}
-      · last refreshed {{ game.last_fetched_at|date:"F j, Y, g:i a" }}
-    </p>
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-4">
+      <p class="small text-body-secondary mb-0" data-testid="igdb-attribution">
+        {% if game.igdb_url %}<a href="{{ game.igdb_url }}" rel="noopener">Data from IGDB</a>{% else %}Data from IGDB{% endif %}
+        · last refreshed {{ game.last_fetched_at|date:"F j, Y, g:i a" }}
+      </p>
+      <form method="post" action="{% url 'games:entry_refresh' entry.pk %}{{ list_querystring }}" class="mb-0" data-testid="refresh-form">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-secondary" data-testid="refresh-entry">Refresh from IGDB</button>
+      </form>
+    </div>
   </div>
 </div>
 {% endblock %}

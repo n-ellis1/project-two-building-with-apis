@@ -80,8 +80,14 @@ class Game(models.Model):
     slug = models.SlugField(max_length=255, blank=True)
     summary = models.TextField(blank=True)
     first_release_date = models.DateField(null=True, blank=True)
+    # Nullable so a refresh can store a record IGDB sent with no `game_type`; a missing
+    # Game Category is never eligible for new saves.
     game_category = models.PositiveSmallIntegerField(
-        "Game Category", choices=GameCategory.choices, default=GameCategory.MAIN_GAME
+        "Game Category",
+        choices=GameCategory.choices,
+        default=GameCategory.MAIN_GAME,
+        null=True,
+        blank=True,
     )
     version_parent = models.PositiveIntegerField("version parent (IGDB ID)", null=True, blank=True)
     cover_image_id = models.CharField(max_length=100, blank=True)

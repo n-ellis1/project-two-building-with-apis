@@ -123,6 +123,60 @@ def _duplicate_or_fail(user, igdb_id: int) -> SaveResult:
     raise SaveFailed()
 
 
+GENERIC_REFRESH_MESSAGE = "Something went wrong while refreshing this game. Try again."
+
+# The Game fields a refresh overwrites with what IGDB sends now.
+REFRESHED_FIELDS = (
+    "name",
+    "slug",
+    "summary",
+    "first_release_date",
+    "game_category",
+    "version_parent",
+    "cover_image_id",
+    "igdb_url",
+)
+
+
+class RefreshFailed(Exception):
+    """An unexpected database failure while storing a refresh (rolled back as a whole).
+    Users only ever see `GENERIC_REFRESH_MESSAGE`."""
+
+    message = GENERIC_REFRESH_MESSAGE
+
+    def __init__(self):
+        super().__init__(self.message)
+
+
+def refresh_game(game: Game) -> Game:
+    """Update a stored, shared Game from IGDB. Used by the website's Refresh button.
+
+    The fetch happens first, outside any transaction: a failed fetch raises
+    `IgdbError` with nothing written. The Game's details (both classification fields
+    included, even a missing Game Category or a new version parent), its platform,
+    genre and theme links, and its last-fetched time are then written in one
+    transaction, so a database error rolls all of them back (`RefreshFailed`).
+
+    No eligibility check: a refresh stores whatever IGDB now says, so a game that has
+    become ineligible keeps every entry and only new saves are refused (the
+    stored-classification rule in `save_game`). Entries are never touched, and
+    existing platform, genre and theme names are never renamed, so a stored platform
+    played value only goes stale if the game loses that platform.
+    """
+    details = igdb.fetch_game(game.igdb_id)  # raises IgdbError; nothing written yet
+    try:
+        with transaction.atomic():
+            for name in REFRESHED_FIELDS:
+                setattr(game, name, getattr(details, name))
+            game.last_fetched_at = timezone.now()
+            game.save(update_fields=[*REFRESHED_FIELDS, "last_fetched_at"])
+            _link_game(game, details)
+    except DatabaseError:
+        game.refresh_from_db()  # drop the unsaved values from this instance
+        raise RefreshFailed() from None
+    return game
+
+
 def _insert_game(details: igdb.IgdbGameDetails) -> Game:
     """The fetched game's row. Call only inside a transaction."""
     return Game.objects.create(

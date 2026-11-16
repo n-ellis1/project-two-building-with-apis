@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.http import Http404
 from django.shortcuts import redirect, render
@@ -29,7 +30,7 @@ from .queries import (
     user_platforms_played,
     user_themes,
 )
-from .saving import SaveFailed, save_game
+from .saving import RefreshFailed, SaveFailed, refresh_game, save_game
 
 
 def home(request):
@@ -129,13 +130,22 @@ def entry_detail(request, entry_id):
     """
     entry = get_owned_entry_or_404(request.user, entry_id)
     query = parse_entry_query(request.user, request.GET)
+    page = parse_page(request.GET.get("page"))
+    game = entry.game
     return render(
         request,
         "games/entry_detail.html",
         {
             "entry": entry,
-            "game": entry.game,
-            "saved_games_return_url": saved_games_url(query, parse_page(request.GET.get("page"))),
+            "game": game,
+            "saved_games_return_url": saved_games_url(query, page),
+            # The Refresh form posts the same validated list state, so the redirect
+            # back here keeps the My Saved Games link.
+            "list_querystring": query.querystring(page),
+            # Kept, not changed: a refresh may have removed the platform (story 79).
+            # Matched by exact name, like the shared validation.
+            "platform_played_stale": bool(entry.platform_played)
+            and not game.platforms.filter(name=entry.platform_played).exists(),
         },
     )
 
@@ -173,6 +183,54 @@ def entry_delete(request, entry_id):
         messages.success(request, f"Removed {game_name} from My Games.")
         return redirect("games:saved_games")
     return render(request, "games/entry_confirm_delete.html", {"entry": entry, "game": entry.game})
+
+
+REFRESH_THROTTLE_SECONDS = 10 * 60
+REFRESH_THROTTLED_MESSAGE = (
+    "A refresh was attempted for this game in the last 10 minutes. Try again later."
+)
+
+
+def refresh_attempt_key(igdb_id: int) -> str:
+    """The shared cache key for a game's last refresh attempt (a game ID, no secrets)."""
+    return f"igdb:refresh_attempt:{int(igdb_id)}"
+
+
+@login_required
+@require_POST
+def entry_refresh(request, entry_id):
+    """Refresh the shared Game behind one of my entries from IGDB (POST only, CSRF
+    checked by middleware). Anyone else's entry ID is a 404, checked before the
+    throttle, so it never calls IGDB or records an attempt.
+
+    - **Throttled:** one attempt per game per 10 minutes across all users, recorded
+      before the IGDB call and kept whatever happens, so failed attempts count too.
+    - **Success:** the Game's details, links and last-fetched time, in one transaction.
+    - **Failure:** nothing changes; the fixed message, with the My Saved Games link
+      for upstream, configuration and unexpected failures.
+
+    Always redirects back to my entry's detail page, carrying the My Saved Games
+    state it was opened from (validated values only, never echoed raw).
+    """
+    entry = get_owned_entry_or_404(request.user, entry_id)
+    game = entry.game
+    query = parse_entry_query(request.user, request.GET)
+    detail_url = reverse("games:entry_detail", args=[entry.pk]) + query.querystring(
+        parse_page(request.GET.get("page"))
+    )
+    if not cache.add(refresh_attempt_key(game.igdb_id), True, REFRESH_THROTTLE_SECONDS):
+        messages.info(request, REFRESH_THROTTLED_MESSAGE)
+        return redirect(detail_url)
+    try:
+        refresh_game(game)
+    except igdb.IgdbError as error:
+        tags = "" if error.code in NO_LINK_CODES else SAVED_GAMES_LINK_TAG
+        messages.error(request, error.message, extra_tags=tags)
+    except RefreshFailed as error:
+        messages.error(request, error.message, extra_tags=SAVED_GAMES_LINK_TAG)
+    else:
+        messages.success(request, f"Refreshed {game.name} from IGDB.")
+    return redirect(detail_url)
 
 
 @login_required

@@ -325,6 +325,41 @@ What the follow-up added:
 
 Issue found and fixed during implementation, before any browser run: [B4](#b4-follow-up-after-phase-8-a-failed-save-from-the-igdb-game-page-showed-the-error-twice).
 
+### Phase 9: Refresh from IGDB
+
+**Result: Pass (2026-11-15).** Automated checks: all five standard checks pass, 275 tests. The user
+ran the Phase 9 browser walkthrough with `uv run python manage.py runserver` and the real `.env`
+(live IGDB), and reported that everything worked as expected. Each step below was covered by that
+walkthrough, except the optional outage check, which wasn't confirmed in the browser.
+
+| # | Step | Expected | Result | Date |
+|---|---|---|---|---|
+| 1 | `demo_b`: open *The Elder Scrolls V: Skyrim* (seeded with the stale platform Nintendo Switch) before refreshing it; edit only the notes and save | The stale-platform warning shows; the notes save and Platform played stays Nintendo Switch | **Pass** (walkthrough). Automated: `test_a_removed_platform_is_kept_with_a_warning_and_other_fields_still_save` | 2026-11-15 |
+| 2 | From a filtered, sorted My Saved Games page, open an entry and click **Refresh from IGDB** | "Refreshed … from IGDB."; "last refreshed" shows a new time | **Pass** (walkthrough). Automated: `test_a_refresh_updates_details_links_and_time_together_and_keeps_entries` | 2026-11-15 |
+| 3 | After step 2, click **← My Saved Games** | Back on the same search, filters, sort and page | **Pass** (walkthrough). Automated: `RefreshReturnStateTests` | 2026-11-15 |
+| 4 | Click Refresh again right away | "A refresh was attempted for this game in the last 10 minutes. Try again later."; the time doesn't change | **Pass** (walkthrough). Automated: `RefreshThrottleTests` | 2026-11-15 |
+| 5 | As the other demo user, refresh the same game within 10 minutes | Throttled with the same message | **Pass** (walkthrough). Automated: `RefreshThrottleTests` (failed attempt by A throttles B; a different game isn't throttled; retry allowed after 10 minutes, on a controlled cache clock) | 2026-11-15 |
+| 6 | Optional: restart with `DJANGO_ENV_FILE` pointing at dummy IGDB credentials, refresh a game not yet refreshed | The "aren't set up" message with the My Saved Games link; details and time unchanged | Unverified in the browser (optional, not confirmed). Automated: `FailedRefreshTests` (all six IGDB failure codes), `test_a_database_failure_after_writes_begin_rolls_everything_back` | |
+
+Automated-only checks (no browser step): the owner's GET on the refresh URL is 405, and another
+user's CSRF-valid POST is 404, each with no IGDB call, no throttle key and the data unchanged
+(`RefreshAccessTests`). A refresh that makes the game ineligible (a version parent appears, the game
+type leaves the allowlist, or IGDB sends no game type) stores the new classification, keeps both
+users' entries, and a third user's save is refused with no IGDB call (`ReclassifyingRefreshTests`).
+
+What Phase 9 added:
+- `saving.refresh_game(game)`: `fetch_game` first, then the Game's details (both classification
+  fields included), its platform, genre and theme links, and `last_fetched_at` in one transaction.
+  A database error rolls it all back (`RefreshFailed`, "Something went wrong while refreshing this
+  game. Try again."). Existing platform, genre and theme names are never renamed.
+- The POST-only `/games/<id>/refresh/` view (`games:entry_refresh`): owner-scoped lookup first, then
+  the throttle (`cache.add` on `igdb:refresh_attempt:<igdb_id>`, 600 seconds, kept after failures),
+  then the refresh. It redirects to the detail page with the validated My Saved Games state.
+- The detail page's CSRF-protected Refresh button and the stale-platform warning.
+- Migration `0002_game_category_nullable`, so a refresh can store a missing game type (never eligible).
+
+No browser bugs or usability issues were found in Phase 9.
+
 ## Browser bugs and usability fixes (Reflection Question 5)
 
 Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** screenshot, the fix

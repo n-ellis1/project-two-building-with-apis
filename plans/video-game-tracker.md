@@ -636,12 +636,12 @@ A detail-page warning appears when the entry's platform played is no longer in t
 
 ### Acceptance criteria
 
-- [ ] A successful refresh updates the details and the "last refreshed" time, and the entry's tracking fields are unchanged.
-- [ ] A failed refresh changes nothing and shows the right message.
-- [ ] A second refresh of the same game within 10 minutes (by any user, even after a failure) is throttled, with no IGDB call.
-- [ ] A refresh that makes the game ineligible (a version parent appears, or the Game Category leaves the allowlist) stores both new values and keeps entries and tracking data. A later save of that game is rejected without an IGDB call.
-- [ ] A removed platform is kept on the entry with a warning, and editing other fields still works.
-- [ ] As the owner, GET on the refresh URL returns 405, with no IGDB call and no attempt recorded. Another user's POST returns 404, with no IGDB call, no attempt recorded and A's data unchanged.
+- [x] A successful refresh updates the details and the "last refreshed" time, and the entry's tracking fields are unchanged.
+- [x] A failed refresh changes nothing and shows the right message.
+- [x] A second refresh of the same game within 10 minutes (by any user, even after a failure) is throttled, with no IGDB call.
+- [x] A refresh that makes the game ineligible (a version parent appears, or the Game Category leaves the allowlist) stores both new values and keeps entries and tracking data. A later save of that game is rejected without an IGDB call.
+- [x] A removed platform is kept on the entry with a warning, and editing other fields still works.
+- [x] As the owner, GET on the refresh URL returns 405, with no IGDB call and no attempt recorded. Another user's POST returns 404, with no IGDB call, no attempt recorded and A's data unchanged.
 
 ### Automated checks
 
@@ -814,7 +814,7 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Phase 7: IGDB client and IGDB search page (ordering kept as a known limitation; B2 and B3 screenshots pending)
 - [x] Phase 8: Save a game from search (browser steps not reported individually)
 - [x] Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page (recorded and completed 2026-11-15, before Phase 9)
-- [ ] Phase 9: Refresh from IGDB
+- [x] Phase 9: Refresh from IGDB (browser walkthrough passed 2026-11-15; optional outage step not confirmed in the browser)
 - [ ] Phase 10: Saved-entry REST API
 - [ ] Phase 11: Command-line client (lesson checkpoint)
 - [ ] Phase 12: Final acceptance sweep and documentation
