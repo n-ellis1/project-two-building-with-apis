@@ -1,6 +1,7 @@
-"""Shared tracking-field validation for the website form and (Phase 10) the API serializer.
+"""Shared tracking-field validation for the website form, the API serializer and the
+save service (API create).
 
-DRF serializers don't run model `clean()` methods, so both callers use this one function.
+DRF serializers don't run model `clean()` methods, so every caller uses this one function.
 It raises Django's `ValidationError` with a dict keyed by field name; DRF converts that
 into its standard field-error format.
 """

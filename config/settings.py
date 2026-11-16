@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
+    "rest_framework.authtoken",
 ]
 
 MIDDLEWARE = [
@@ -107,6 +109,20 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "games:saved_games"
 LOGOUT_REDIRECT_URL = "login"
+
+# Saved-entry API (Phase 10). Token first, so a request with no credentials gets 401
+# (with a WWW-Authenticate header) rather than 403; the session lets a signed-in
+# browser use the browsable API.
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    # Pagination (10 per page) is set on the viewset, `games.api.EntryPagination`.
+    # Hours played as a JSON number, not a string.
+    "COERCE_DECIMAL_TO_STRING": False,
+}
 
 # Bootstrap alert classes for Django message levels.
 MESSAGE_TAGS = {message_constants.ERROR: "danger"}

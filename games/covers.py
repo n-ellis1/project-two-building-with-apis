@@ -1,6 +1,6 @@
 """Cover image URLs on IGDB's image server, built from a stored cover image ID.
 
-This is the one cover URL builder, used by templates (and by the API in Phase 10).
+This is the one cover URL builder, used by templates and by the API.
 Covers are hotlinked, never downloaded or re-hosted.
 """
 

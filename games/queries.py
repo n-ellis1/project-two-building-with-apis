@@ -5,7 +5,8 @@ Every entry lookup starts from `owned_entries(user)`, so another user's entry ID
 exactly like an ID that doesn't exist (404).
 
 Query state flows one way: request values -> `parse_entry_query()` (forgiving, for the
-website; the API adds a strict parser in Phase 10) -> `EntryQuery` -> `saved_entries()`.
+website) or `parse_entry_query_strict()` (for the API) -> `EntryQuery` ->
+`resolve_saved_search()` -> `saved_entries()`.
 Controls, pager links, Clear filters and detail return links are all rendered from the
 same `EntryQuery`, so they can never disagree with the results.
 """
@@ -14,6 +15,7 @@ import re
 from dataclasses import dataclass, replace
 from urllib.parse import urlencode
 
+from django.core.exceptions import ValidationError
 from django.db.models import F, Q
 from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
@@ -101,8 +103,8 @@ def user_platforms_played(user) -> list[str]:
 class EntryQuery:
     """Already-validated saved-entries query state (search, filters, sort).
 
-    The website parses request values into this forgivingly; the API (Phase 10)
-    parses strictly. Both then call `saved_entries(user, query)`.
+    The website parses request values into this forgivingly; the API parses
+    strictly. Both then call `saved_entries(user, query)`.
     """
 
     q: str = ""
@@ -139,6 +141,12 @@ class EntryQuery:
         return f"?{urlencode(params)}" if params else ""
 
 
+def clean_saved_search(value) -> str:
+    """The saved-games search term: whitespace collapsed, cut to `MAX_SEARCH_LENGTH`.
+    Shared by the website and API parsers."""
+    return " ".join(str(value).split())[:MAX_SEARCH_LENGTH]
+
+
 def parse_entry_query(user, params) -> EntryQuery:
     """Website (forgiving) parsing of `q`, `status`, `platform`, `favorite`, `theme`, `sort`.
 
@@ -146,7 +154,7 @@ def parse_entry_query(user, params) -> EntryQuery:
     or platform that isn't on the user's own saved games is dropped, so a bad or
     stale link still shows the list. Only values that pass are ever echoed back.
     """
-    q = " ".join(str(params.get("q", "")).split())[:MAX_SEARCH_LENGTH]
+    q = clean_saved_search(params.get("q", ""))
 
     status = params.get("status", "")
     if status not in Entry.Status.values:
@@ -171,6 +179,69 @@ def parse_entry_query(user, params) -> EntryQuery:
 
     return EntryQuery(
         q=q, status=status, platform=platform, favorite=favorite, theme=theme, sort=sort
+    )
+
+
+FAVORITE_VALUES = {"true": True, "1": True, "false": False, "0": False}
+INVALID_STATUS = "Choose one of: " + ", ".join(Entry.Status.values) + "."
+INVALID_PLATFORM = "Not a Platform Played on your saved games."
+INVALID_FAVORITE = "Use true, false, 1 or 0."
+MALFORMED_THEME = "Use an IGDB theme ID (a whole number)."
+INVALID_THEME = "Not a theme on your saved games."
+INVALID_SORT = "Choose one of: " + ", ".join(SORT_LABELS) + "."
+
+
+def parse_entry_query_strict(user, params) -> EntryQuery:
+    """API (strict) parsing of the same parameters into the same `EntryQuery`.
+
+    A blank or missing value means "no filter" (or the default sort). Any other
+    value that the website would quietly drop is an error instead: this raises
+    Django's `ValidationError` keyed by parameter name, with every bad parameter
+    reported at once. Theme and Platform Played are checked against the user's own
+    entries only, so a value from another user's list is invalid. `q` is free text,
+    normalized exactly as on the website.
+    """
+    errors = {}
+
+    status = str(params.get("status", ""))
+    if status and status not in Entry.Status.values:
+        errors["status"] = [INVALID_STATUS]
+
+    platform = str(params.get("platform", ""))
+    if platform and platform not in user_platforms_played(user):
+        errors["platform"] = [INVALID_PLATFORM]
+
+    favorite = False
+    raw_favorite = str(params.get("favorite", "")).strip().lower()
+    if raw_favorite:
+        if raw_favorite in FAVORITE_VALUES:
+            favorite = FAVORITE_VALUES[raw_favorite]
+        else:
+            errors["favorite"] = [INVALID_FAVORITE]
+
+    theme = None
+    raw_theme = str(params.get("theme", "")).strip()
+    if raw_theme:
+        if not (raw_theme.isascii() and raw_theme.isdigit()):
+            errors["theme"] = [MALFORMED_THEME]
+        elif not user_themes(user).filter(igdb_id=int(raw_theme)).exists():
+            errors["theme"] = [INVALID_THEME]
+        else:
+            theme = int(raw_theme)
+
+    sort = str(params.get("sort", "")) or DEFAULT_SORT
+    if sort not in SORT_LABELS:
+        errors["sort"] = [INVALID_SORT]
+
+    if errors:
+        raise ValidationError(errors)
+    return EntryQuery(
+        q=clean_saved_search(params.get("q", "")),
+        status=status,
+        platform=platform,
+        favorite=favorite,
+        theme=theme,
+        sort=sort,
     )
 
 

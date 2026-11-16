@@ -1,6 +1,6 @@
 """The one save service: add an IGDB game to a user's list.
 
-Used by the website's Save button and, from Phase 10, by the API's create.
+Used by the website's Save button and by the API's create (with optional tracking values).
 """
 
 from dataclasses import dataclass
@@ -11,6 +11,7 @@ from django.utils import timezone
 from . import igdb
 from .models import Entry, Game, Genre, Platform, Theme, is_eligible
 from .queries import owned_entries
+from .validation import validate_tracking
 
 GENERIC_SAVE_MESSAGE = "Something went wrong while saving this game. Try again."
 
@@ -34,8 +35,14 @@ class SaveResult:
     created: bool
 
 
-def save_game(user, igdb_id: int) -> SaveResult:
+def save_game(user, igdb_id: int, tracking: dict | None = None) -> SaveResult:
     """Save IGDB game `igdb_id` to `user`'s list. The owner is always `user`.
+
+    `tracking` holds optional, already type-checked tracking values for the new entry
+    (the API's create). They are checked with the shared `validate_tracking()` against
+    the game's platforms inside the write transaction, after any IGDB fetch, so an
+    invalid value raises Django's `ValidationError` and rolls back the Game, its
+    links and the Entry together. They are never applied to an existing entry.
 
     - **Already mine:** returns my existing entry unchanged (`created=False`), before
       any eligibility check or IGDB call.
@@ -53,18 +60,19 @@ def save_game(user, igdb_id: int) -> SaveResult:
     (a generic, safe message). The one exception: a new Game whose insert collided
     with another request's is retried once as a stored Game.
     """
+    tracking = dict(tracking or {})
     existing = _my_entry(user, igdb_id)
     if existing is not None:
         return SaveResult(existing, created=False)
 
     game = Game.objects.filter(igdb_id=igdb_id).first()
     if game is not None:
-        return _save_stored(user, game)
+        return _save_stored(user, game, tracking)
 
     details = igdb.fetch_game(igdb_id)  # raises IgdbError; nothing written yet
     if not is_eligible(details.game_category, details.version_parent):
         raise igdb.IgdbError("game_category_excluded")
-    return _save_new(user, details)
+    return _save_new(user, details, tracking)
 
 
 def _my_entry(user, igdb_id: int) -> Entry | None:
@@ -72,13 +80,21 @@ def _my_entry(user, igdb_id: int) -> Entry | None:
     return owned_entries(user).filter(game__igdb_id=igdb_id).first()
 
 
-def _save_stored(user, game: Game) -> SaveResult:
+def _create_entry(user, game: Game, tracking: dict) -> Entry:
+    """The new Entry, with any tracking values checked first. Call only inside a
+    transaction: a `ValidationError` here rolls back everything written before it."""
+    if tracking:
+        validate_tracking(game, tracking)
+    return Entry.objects.create(owner=user, game=game, **tracking)
+
+
+def _save_stored(user, game: Game, tracking: dict) -> SaveResult:
     # Stored-classification rule: the stored values decide, with no IGDB call.
     if not is_eligible(game.game_category, game.version_parent):
         raise igdb.IgdbError("game_category_excluded")
     try:
         with transaction.atomic():
-            entry = Entry.objects.create(owner=user, game=game)
+            entry = _create_entry(user, game, tracking)
     except IntegrityError:
         pass  # rolled back; maybe a simultaneous save of mine, judged below
     except DatabaseError:
@@ -88,7 +104,7 @@ def _save_stored(user, game: Game) -> SaveResult:
     return _duplicate_or_fail(user, game.igdb_id)
 
 
-def _save_new(user, details: igdb.IgdbGameDetails) -> SaveResult:
+def _save_new(user, details: igdb.IgdbGameDetails, tracking: dict) -> SaveResult:
     game_insert_collided = False
     try:
         with transaction.atomic():
@@ -97,8 +113,8 @@ def _save_new(user, details: igdb.IgdbGameDetails) -> SaveResult:
             except IntegrityError:
                 game_insert_collided = True
                 raise
-            _link_game(game, details)
-            entry = Entry.objects.create(owner=user, game=game)
+            _link_game(game, details)  # before validation: platform played needs the links
+            entry = _create_entry(user, game, tracking)
     except IntegrityError:
         pass  # the Game, its links and the Entry are all rolled back; judged below
     except DatabaseError:
@@ -111,7 +127,7 @@ def _save_new(user, details: igdb.IgdbGameDetails) -> SaveResult:
         # (eligibility rechecked on the stored values, no second IGDB call).
         stored = Game.objects.filter(igdb_id=details.igdb_id).first()
         if stored is not None:
-            return _save_stored(user, stored)
+            return _save_stored(user, stored, tracking)
     return _duplicate_or_fail(user, details.igdb_id)
 
 

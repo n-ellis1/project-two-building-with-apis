@@ -28,6 +28,67 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Phase 10: Token-authenticated saved-entry REST API
+
+### Prompts
+1. `/implement` Read CLAUDE.md, prd/video-game-tracker.md, and the Phase 10 section of plans/video-game-tracker.md. Implement Phase 10 only: the saved-games REST API.
+
+   Follow the approved plan and pause at the required TDD checkpoints. Verify token and session authentication, owner-scoped CRUD, and that PATCH validates submitted values against stored fields while leaving omitted fields unchanged. Reuse the existing save service, tracking validation, and local search fallback so API behavior matches the website where the plan calls for it.
+
+   Run the five standard checks and give me a short browser and API checklist. Keep real tokens out of output and logs. Stop for my verification before marking Phase 10 complete, staging, committing, pushing, or starting Phase 11.
+2. I approve all three Phase 10 TDD behaviors. Start with PATCH. Send only a finish_date earlier than the stored start_date and verify that the response is 400 with a finish_date field error and the stored tracking data is unchanged. Then send a valid single-field PATCH and verify that only the submitted tracking field changes and the response reflects the saved value.
+
+   For the later strict-query cycle, include an invalid Platform Played value along with invalid status, favorite, sort, and theme values. For the create-error cycle, check that a rate-limit response includes Retry-After when the IGDB client supplies it.
+
+   Run the focused PATCH tests, show me the RED result, and pause before implementing the PATCH behavior.
+3. I approve the PATCH RED result. For validation, merge submitted fields over the entry's stored values and call the existing validate_tracking() helper, passing the stored platform so an unchanged stale value remains allowed. Return validation errors under the relevant field.
+
+   Use the merged values for validation only. After a valid PATCH, save only the submitted tracking fields. Rerun the focused tests and show me the GREEN result, including that the invalid request left the database unchanged. Pause before starting the strict-query cycle.
+4. I accept the PATCH GREEN result. Start the strict-query cycle. Test that invalid status, Platform Played, favorite, sort, and theme values return 400 with the error under the relevant parameter. Include a theme that exists only on another user's saved games. Test that nonnumeric, zero, negative, and out-of-range page values return 404.
+
+   Include a valid filtered query as a regression guard. Run the focused tests, show me the RED result, and pause before implementing the strict API parser. Keep the website's forgiving parser unchanged.
+5. I approve the strict-query RED tests and the proposed rules. Implement the strict API parser using EntryQuery and the shared saved_entries() logic. Return field-keyed 400 errors for invalid filters or sorts, and scope the allowed Theme and Platform Played values to the signed-in user's entries. Disable page=last and return 404 for invalid or out-of-range pages.
+
+   Keep the website parser unchanged. Use the existing q normalization and resolve_saved_search() for the API, with separate tests for Roman numeral fallback, the original term taking priority, and owner isolation.
+
+   Rerun the focused list tests, show me the GREEN result, and pause before starting the create-error cycle.
+6. I accept the strict-query GREEN result. Start the create-error cycle. Test that upstream IGDB failures return 503 with the agreed {"detail", "code"} body. For rate limiting, verify that Retry-After is included when the client supplies a valid value and omitted when it doesn't.
+
+   Verify that a missing IGDB game, an excluded release, and an already-saved entry return 400 with the agreed codes and messages. Also cover the unexpected SaveFailed case with a safe generic 500 response. Confirm that failed requests create no new entries and that a duplicate leaves the existing entry and its tracking data unchanged.
+
+   Use mocks for upstream failures and the existing save service for the duplicate case. Run the focused tests, show me the RED result, and pause before implementing the response mapping.
+7. I approve the create-error RED tests. Reuse the website's duplicate message exactly, "Already in your games", with code duplicate_entry and status 400. Use GENERIC_SAVE_MESSAGE with code save_failed and status 500 for unexpected SaveFailed errors.
+
+   Implement the agreed mapping: upstream failures return 503, and unknown games, excluded releases, and duplicates return 400. Include Retry-After only for a rate-limit error with a valid value from the IGDB client. Return JSON with detail and code, with safe messages only.
+
+   Rerun the focused tests and show me the GREEN result, including that failures write no rows and duplicates preserve the existing entry. Pause before the remaining Phase 10 work.
+8. I accept the create-error GREEN result. Finish the remaining Phase 10 work as proposed.
+
+   For create, reuse the shared tracking validation against the game's platforms. Test that invalid tracking fields leave all eight tables unchanged even when IGDB successfully returns a new game. Keep the IGDB request outside the write transaction. Verify that a valid create saves the supplied tracking fields and returns the saved entry.
+
+   Finish PUT reset behavior, reject igdb_id on updates, ignore nested game input, and verify DELETE returns 204 while keeping the shared Game. Cover token and session authentication, owner isolation, stale-platform updates, and list and detail access during an IGDB outage.
+
+   Update README.md with API examples and CLAUDE.md with the API conventions. Run the five standard checks and give me a short browser and API checklist. Use placeholders in commands and keep real tokens out of output and logs. Stop for my verification before marking Phase 10 complete, staging, committing, pushing, or starting Phase 11.
+9. I completed the Phase 10 manual walkthrough and everything worked as expected. Record my overall pass in docs/verification.md, covering the browsable API, query validation, PATCH and date validation, the cross-user 404, and token authentication. Mark any steps I didn't separately confirm as covered by the overall walkthrough or by automated tests, as appropriate. Keep the token out of all documentation and logs.
+
+   Update PROMPTS.md and CLAUDE.md, mark Phase 10 complete in the plan, and rerun the five standard checks. Show me the results, git status --short, and the planned commit message. Pause before staging, committing, pushing, or starting Phase 11.
+
+### Summary
+- **Outcome:** Phase 10 built and verified (the user reported one overall pass for the browser and token walkthrough).
+  - **DRF 3.18.3** added after checking PyPI's declared support for Django 6.1 and Python 3.14; Token then Session authentication, `IsAuthenticated`, 10 per page.
+  - **Three approved TDD cycles**, each RED on an assertion first:
+    - **PATCH merge:** submitted values merged over the stored ones for `validate_tracking()` only; `update()` saves only the submitted fields.
+    - **Strict list query:** `parse_entry_query_strict()` builds the same `EntryQuery` and rejects invalid status, platform, favorite, sort and theme values (another user's included) with 400s keyed by parameter; `?page=last` turned off; `resolve_saved_search()` reused.
+    - **Create errors:** 503 for upstream codes (`Retry-After` only with a valid value), 400 for unknown, excluded and duplicate (`duplicate_entry`, the website's "Already in your games"), 500 `save_failed`, all as `{"detail", "code"}`.
+  - **Built normally:** tracking fields on create (validated inside the save service's transaction, after the IGDB fetch, so nothing is half-saved), PUT reset, `igdb_id` rejected on update, nested game ignored, DELETE 204 keeping the Game, auth, the owner-isolation matrix, outage tests, README API examples, a `GAME_TRACKER_TOKEN` placeholder. 325 tests.
+- **Deviations:** the user had the duplicate response reuse the website's message exactly instead of the proposed "Already in your games." with a period, and added an invalid Platform Played case, the Retry-After check and the SaveFailed 500 to the cycles. The `GAME_TRACKER_TOKEN` placeholder was added in Phase 10 rather than Phase 11, because the Phase 10 manual steps store the token. No follow-up questions were asked.
+- **Sideways:**
+  - Pointing DRF's `DEFAULT_PAGINATION_CLASS` at `games.api` caused a circular import; pagination was set on the viewset instead.
+  - In the PATCH cycle, the single-field test already passed on the scaffold (DRF's partial update); reported and kept as a guard.
+  - The first create-error RED run had one ERROR instead of a FAIL (`response.json()` on Django's HTML 500 page); a Content-Type assertion was added as a mechanical repair.
+  - The remaining-work tests all passed first time, so a temporary mutation (turning off the PUT reset) was used to confirm they can fail, then reverted.
+  - `ruff check` flagged a docstring line over 100 characters after a wording edit; rewrapped and rechecked.
+
 ## 2026-11-15 — Phase 9: Refresh from IGDB with throttling and safe reclassification
 
 ### Prompts

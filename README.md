@@ -27,6 +27,132 @@ Optional: `uv run python manage.py createsuperuser` for `/admin/`. Full setup do
 
 It's safe to rerun. It only adds what's missing. Existing demo accounts keep their passwords (even if `DEMO_PASSWORD` changes), and existing games and entries are never changed. If `demo_a` or `demo_b` already belongs to an account the command didn't create, it stops without changing anything.
 
+### Saved-entry REST API
+
+The same private saved entries are available at `/api/entries/` (Django REST Framework). Every request needs authentication: a token in the `Authorization` header, or your website session (signed in, open <http://127.0.0.1:8000/api/entries/> for the browsable API). Without either, the API returns `401`. Another user's entry ID always returns `404`.
+
+| Method | URL | Does |
+|---|---|---|
+| `GET` | `/api/entries/` | List your entries, 10 per page: `count`, `next`, `previous`, `results` |
+| `POST` | `/api/entries/` | Save a game by `igdb_id`, with optional tracking fields (through the same save service as the website) |
+| `GET` | `/api/entries/<id>/` | One of your entries |
+| `PATCH` | `/api/entries/<id>/` | Change only the fields you send, checked together with the stored values |
+| `PUT` | `/api/entries/<id>/` | Replace all tracking fields; omitted ones reset to blank or their default |
+| `DELETE` | `/api/entries/<id>/` | Remove the entry (`204`); the shared game stays |
+
+`<id>` is the entry ID (the same as in `/games/<id>/`), not the IGDB ID.
+
+**Tracking fields:** `status` (`want_to_play`, `playing`, `completed`, `on_hold`, `dropped`), `favorite` (true/false), `rating` (1–10 or null), `notes`, `platform_played` (blank or one of the game's platforms; a value a refresh removed may stay unchanged), `start_date` and `finish_date` (`YYYY-MM-DD`, finish not before start), `hours_played` (not negative). Each entry also has a read-only nested `game`. `igdb_id` is required on create and rejected on update, and anything sent inside `game` is ignored.
+
+**List parameters** (same meaning as on My Saved Games): `q` (title, summary, platform, genre, theme or your notes, with the same "Dark Souls 3" → "Dark Souls III" fallback), `status`, `platform` (a Platform Played on your entries), `favorite` (`true`, `false`, `1`, `0`), `theme` (an IGDB theme ID on your saved games, for example `19` for Horror), `sort` (`added` (default), `title`, `title_desc`, `rating`, `release`, `hours`, `updated`) and `page`. Unlike the website, an invalid value returns `400` keyed by the parameter, and a bad or out-of-range page returns `404`.
+
+**Errors when saving** use a `{"detail", "code"}` body:
+
+| Status | `code` |
+|---|---|
+| `503` | `igdb_timeout`, `igdb_unreachable`, `igdb_rate_limited` (with `Retry-After` when IGDB sent a valid one), `igdb_unavailable`, `igdb_misconfigured` |
+| `400` | `igdb_game_not_found`, `game_category_excluded`, `duplicate_entry` |
+| `500` | `save_failed` (an unexpected error; nothing was saved) |
+
+Tracking-field problems use DRF's standard field-error format, for example `{"finish_date": ["Finish date can't be before the start date."]}`.
+
+#### Create a token
+
+```powershell
+uv run python manage.py drf_create_token <username>
+```
+
+The command prints the new token once. Copy it straight into `.env` as `GAME_TRACKER_TOKEN=<token>`, then clear the terminal (`Clear-Host`). Never commit it, paste it into docs or show it in screenshots. To replace a token, run the command again with `-r`.
+
+#### Call it from PowerShell without echoing the token
+
+```powershell
+$token = (Select-String -Path .env -Pattern '^GAME_TRACKER_TOKEN=(.+)$').Matches[0].Groups[1].Value
+$headers = @{ Authorization = "Token $token" }
+$api = "http://127.0.0.1:8000/api/entries/"
+
+# No token: 401
+try { Invoke-RestMethod $api } catch { $_.Exception.Response.StatusCode.value__ }
+
+# With the token: 200
+Invoke-RestMethod $api -Headers $headers | Select-Object count, next
+Invoke-RestMethod "${api}?status=playing&sort=title" -Headers $headers |
+    ForEach-Object { $_.results } | Select-Object id, status, @{ n = "title"; e = { $_.game.name } }
+
+Remove-Variable token, headers
+```
+
+#### Example: create
+
+```http
+POST /api/entries/
+Authorization: Token <your token>
+Content-Type: application/json
+
+{"igdb_id": 1942, "status": "playing", "platform_played": "PC (Microsoft Windows)", "start_date": "2026-11-01"}
+```
+
+`201 Created`:
+
+```json
+{
+  "id": 42,
+  "game": {
+    "igdb_id": 1942,
+    "name": "The Witcher 3: Wild Hunt",
+    "first_release_date": "2015-05-19",
+    "game_category": 0,
+    "game_category_label": "Main Game",
+    "platforms": ["PC (Microsoft Windows)", "PlayStation 4", "Xbox One"],
+    "genres": ["Role-playing (RPG)", "Adventure"],
+    "themes": ["Action", "Fantasy", "Open world"],
+    "cover_url": "https://images.igdb.com/igdb/image/upload/t_cover_big/<cover id>.jpg",
+    "igdb_url": "https://www.igdb.com/games/the-witcher-3-wild-hunt"
+  },
+  "status": "playing",
+  "favorite": false,
+  "rating": null,
+  "notes": "",
+  "platform_played": "PC (Microsoft Windows)",
+  "start_date": "2026-11-01",
+  "finish_date": null,
+  "hours_played": null,
+  "created_at": "2026-11-15T18:04:12.345678Z",
+  "updated_at": "2026-11-15T18:04:12.345678Z"
+}
+```
+
+Saving the same game again returns `400` with `{"detail": "Already in your games", "code": "duplicate_entry"}`. With IGDB unreachable, saving a game nobody has saved before returns `503` with `{"detail": "Couldn't reach IGDB. Try again in a moment.", "code": "igdb_unreachable"}`. A game already stored in the app still saves.
+
+#### Example: PATCH
+
+```http
+PATCH /api/entries/42/
+Authorization: Token <your token>
+Content-Type: application/json
+
+{"status": "completed", "finish_date": "2026-11-14", "hours_played": 96.5}
+```
+
+`200 OK` returns the whole entry with those three fields changed and everything else as it was (`"status": "completed"`, `"finish_date": "2026-11-14"`, `"hours_played": 96.5`, `"start_date": "2026-11-01"`, …).
+
+A finish date before the stored start date is refused, even though `start_date` wasn't sent:
+
+```http
+PATCH /api/entries/42/
+Content-Type: application/json
+
+{"finish_date": "2026-10-01"}
+```
+
+`400 Bad Request`, and nothing changes:
+
+```json
+{"finish_date": ["Finish date can't be before the start date."]}
+```
+
+In PowerShell: `Invoke-RestMethod "${api}42/" -Method Patch -Headers $headers -ContentType "application/json" -Body '{"status": "completed"}'`.
+
 ## IGDB verification script
 
 `scripts/igdb_search.py` searches [IGDB](https://www.igdb.com) for games by title and prints each match's title, IGDB ID, release date (UTC) and platforms, up to 10 results per page. It confirms that real API requests work before the Django game tracker is designed. Background research is in [docs/research/game-api-comparison.md](docs/research/game-api-comparison.md).

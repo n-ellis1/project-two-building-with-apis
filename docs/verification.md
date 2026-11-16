@@ -360,6 +360,66 @@ What Phase 9 added:
 
 No browser bugs or usability issues were found in Phase 9.
 
+### Phase 10: Saved-entry REST API
+
+**Result: Pass (2026-11-15).** Automated checks: all five standard checks pass, 325 tests. Django
+REST Framework 3.18.3 was checked before it was added: PyPI declares Django 6.1 and Python 3.14
+support, and it runs on the installed Django 6.1.3 and Python 3.14.7. The user ran
+`uv run python manage.py migrate` (which adds DRF's token table), then the Phase 10 walkthrough with
+`uv run python manage.py runserver` and the demo accounts. They reported one overall pass covering the
+browsable API, query validation, PATCH and date validation, the cross-user 404 and token
+authentication. Individual results inside each step weren't reported one by one, so each step is
+recorded as covered by that overall walkthrough, with the automated tests that cover the details.
+
+The token was created with `drf_create_token`, stored in the git-ignored `.env` as
+`GAME_TRACKER_TOKEN`, and read from there in PowerShell without being echoed. It doesn't appear in
+this record, the README or any screenshot.
+
+| # | Step | Expected | Result | Date |
+|---|---|---|---|---|
+| 1 | Signed in as `demo_a`, open `/api/entries/` | The browsable API lists the user's entries with `count`, 10 results and a `next` link | **Pass** (overall walkthrough). Automated: `test_website_session_works_including_the_browsable_api`, `test_list_pages_hold_ten_with_next_and_previous_links` | 2026-11-15 |
+| 2 | Try `?theme=19&sort=title`, `?sort=bogus`, `?favorite=maybe`, `?page=99` and `?page=last` | Filtered list; 400 under `sort`; 400 under `favorite`; 404; 404 | **Pass** (overall walkthrough; the individual URLs weren't reported one by one). Automated: `StrictListParameterTests` (invalid status, platform, favorite, sort and theme, including another user's theme and platform; pages `abc`, `1.5`, `last`, `0`, `-1`, out of range; a valid filtered query) | 2026-11-15 |
+| 3 | PATCH one entry's status to `completed` in the browsable API, then open its website detail page | The detail page shows Completed; no other field changed | **Pass** (overall walkthrough). Automated: `test_valid_single_field_patch_changes_only_that_field` | 2026-11-15 |
+| 4 | PATCH only a `finish_date` before the entry's stored start date | 400 with a `finish_date` field error; nothing changes | **Pass** (overall walkthrough). Automated: `test_finish_date_before_stored_start_date_is_a_field_error` | 2026-11-15 |
+| 5 | Sign in as `demo_b` and open one of `demo_a`'s `/api/entries/<id>/` | 404 | **Pass** (overall walkthrough). Automated: `OwnerIsolationTests` (GET, PUT, PATCH and DELETE by token and by session, A's row unchanged, identical to a missing ID) | 2026-11-15 |
+| 6 | `drf_create_token` for a demo user; store the token in `.env` as `GAME_TRACKER_TOKEN`; clear the terminal | A token exists and is only in `.env` | **Pass** (overall walkthrough) | 2026-11-15 |
+| 7 | PowerShell `Invoke-RestMethod` from the README, without and with `Authorization: Token …` | 401 without; 200 with `count` and `next`; token never printed | **Pass** (overall walkthrough). Automated: `test_no_credentials_is_401_for_every_method`, `test_invalid_token_is_401`, `test_valid_token_works` | 2026-11-15 |
+
+Automated-only checks (no browser step):
+
+- **Create:** a valid create saves every tracking field sent; invalid tracking writes nothing to any
+  of the eight tables, even after IGDB returned a new game; field errors come before any IGDB call;
+  IGDB is called outside any write transaction (`CreateWithTrackingTests`,
+  `CreateFetchOutsideTransactionTests`).
+- **Create errors:** each upstream code is 503 with `{"detail", "code"}`; `Retry-After` is passed on
+  only when the client parsed a valid one; unknown, excluded (fetched or stored) and duplicate games
+  are 400 (the duplicate leaves the existing entry unchanged); an unexpected `SaveFailed` is a generic
+  500 (`CreateErrorResponseTests`). The owner is always the authenticated user, even if another owner
+  is posted.
+- **Updates:** PUT resets omitted fields; any `igdb_id` on PATCH or PUT is 400; nested `game` and
+  read-only fields are ignored; the stale-platform rules hold for PATCH and PUT
+  (`PutAndUpdateRulesTests`, `StalePlatformUpdateTests`).
+- **Delete:** 204, and the shared Game stays (`DeleteTests`).
+- **Search fallback:** "Dark Souls 3" finds "Dark Souls III" only when the typed term matches
+  nothing, and never reaches another user's entries (`ApiSearchFallbackTests`).
+- **Session CSRF:** a session write without the CSRF token is 403 and changes nothing.
+- **Outage:** with the client's HTTP failing, list and retrieve work, a stored game still saves, and a
+  new game is 503 `igdb_unreachable` with no rows written; with missing credentials, a new game is
+  503 `igdb_misconfigured` (`OutageTests`, `MissingCredentialsTests`).
+
+What Phase 10 added:
+- `games/api.py`: `EntryViewSet` on a DRF router at `/api/entries/`, starting from `owned_entries()`;
+  `EntrySerializer` with the read-only nested `GameSerializer`; `EntryPagination` (10 per page, no
+  `?page=last`); the save-error mapping.
+- `queries.parse_entry_query_strict()`, which builds the same `EntryQuery` as the website or raises
+  errors keyed by parameter. Both parsers share `clean_saved_search()`.
+- `save_game(user, igdb_id, tracking)`: optional tracking values checked with `validate_tracking()`
+  inside the write transaction.
+- Token then Session authentication with `IsAuthenticated`; a `GAME_TRACKER_TOKEN` placeholder in
+  `.env.example`; README API examples.
+
+No browser bugs or usability issues were found in Phase 10.
+
 ## Browser bugs and usability fixes (Reflection Question 5)
 
 Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** screenshot, the fix

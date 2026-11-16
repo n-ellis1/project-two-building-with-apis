@@ -686,13 +686,13 @@ Document example create and PATCH requests and responses in the README.
 
 ### Acceptance criteria
 
-- [ ] No credentials gives 401. A valid token and a website session both work.
-- [ ] List parameters mean the same as on the website, including the Roman-numeral search fallback from Phase 7. Invalid values give 400, and bad pages give 404.
-- [ ] Create sets the owner from the token even if another owner is posted. Each error returns the specified status and body.
-- [ ] PATCH with a finish date before the stored start date gives a 400 field error. Stale-platform rules hold for PATCH and PUT.
-- [ ] PUT resets omitted optional fields. Changing `igdb_id` gives 400.
-- [ ] With user B's token or session, GET, PUT, PATCH and DELETE on A's entry return 404 and A's entry is unchanged. B's list (including a search for A-only notes) has none of A's entries. A theme only on A's games gives 400 for B.
-- [ ] With the IGDB client failing, list and retrieve still work, and creating a new game returns 503.
+- [x] No credentials gives 401. A valid token and a website session both work.
+- [x] List parameters mean the same as on the website, including the Roman-numeral search fallback from Phase 7. Invalid values give 400, and bad pages give 404.
+- [x] Create sets the owner from the token even if another owner is posted. Each error returns the specified status and body.
+- [x] PATCH with a finish date before the stored start date gives a 400 field error. Stale-platform rules hold for PATCH and PUT.
+- [x] PUT resets omitted optional fields. Changing `igdb_id` gives 400.
+- [x] With user B's token or session, GET, PUT, PATCH and DELETE on A's entry return 404 and A's entry is unchanged. B's list (including a search for A-only notes) has none of A's entries. A theme only on A's games gives 400 for B.
+- [x] With the IGDB client failing, list and retrieve still work, and creating a new game returns 503.
 
 ### Automated checks
 
@@ -815,6 +815,6 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Phase 8: Save a game from search (browser steps not reported individually)
 - [x] Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page (recorded and completed 2026-11-15, before Phase 9)
 - [x] Phase 9: Refresh from IGDB (browser walkthrough passed 2026-11-15; optional outage step not confirmed in the browser)
-- [ ] Phase 10: Saved-entry REST API
+- [x] Phase 10: Saved-entry REST API (browser and token walkthrough passed 2026-11-15, reported as one overall pass)
 - [ ] Phase 11: Command-line client (lesson checkpoint)
 - [ ] Phase 12: Final acceptance sweep and documentation
