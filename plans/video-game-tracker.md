@@ -778,10 +778,10 @@ Standard checks (Ruff covers the script), plus:
 
 ### Acceptance criteria
 
-- [ ] Every PRD acceptance criterion has an automated test, an entry in `docs/verification.md`, or both, and all pass.
-- [ ] With the network off (or credentials missing), every saved-games feature works, and IGDB features show the agreed messages with a link to My Saved Games.
-- [ ] README and `docs/verification.md` are complete, and a fresh clone can be set up by following the README alone.
-- [ ] No secrets appear in the repo, docs, PROMPTS.md or test output (`git grep` for the `GAME_TRACKER_TOKEN` value and the IGDB secret value, run locally, finds nothing).
+- [x] Every PRD acceptance criterion has an automated test, an entry in `docs/verification.md`, or both, and all pass.
+- [x] With the network off (or credentials missing), every saved-games feature works, and IGDB features show the agreed messages with a link to My Saved Games.
+- [x] README and `docs/verification.md` are complete, and a fresh clone can be set up by following the README alone.
+- [x] No secrets appear in the repo, docs, PROMPTS.md or test output (`git grep` for the `GAME_TRACKER_TOKEN` value and the IGDB secret value, run locally, finds nothing). **Checked 2026-11-15:** instead of `git grep`, an in-memory scan compared the five real `.env` credential values (`DJANGO_SECRET_KEY`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `GAME_TRACKER_TOKEN`, `DEMO_PASSWORD`) with the 7 staged files and all 114 files in the index: Pass. Test output is covered by the token-safety tests rather than this scan. Details are in `docs/verification.md`, Phase 12.
 
 ### Automated checks
 
@@ -817,4 +817,4 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Phase 9: Refresh from IGDB (browser walkthrough passed 2026-11-15; optional outage step not confirmed in the browser)
 - [x] Phase 10: Saved-entry REST API (browser and token walkthrough passed 2026-11-15, reported as one overall pass)
 - [x] Phase 11: Command-line client (lesson checkpoint; walkthrough passed 2026-11-15, with the filtered list and the entry 13 update confirmed individually; terminal screenshots pending)
-- [ ] Phase 12: Final acceptance sweep and documentation
+- [x] Phase 12: Final acceptance sweep and documentation (manual walkthrough reported as one overall pass 2026-11-15, steps not confirmed individually; reflection screenshots still pending)

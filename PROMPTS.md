@@ -28,6 +28,28 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Phase 12: final acceptance sweep, owner isolation, IGDB outage and documentation
+
+### Prompts
+1. `/implement` Read CLAUDE.md, prd/video-game-tracker.md, and Phase 12 of plans/video-game-tracker.md. Start the final verification and documentation pass. Compare the finished app against the PRD, run the five standard checks, and give me a short checklist for any remaining browser, API, outage, or script verification.
+
+   Review README.md and docs/verification.md for accuracy. List the missing screenshots and point me to the code and test results I can use for the reflection. I'll write the reflection in my own words.
+
+   Pause for my review before marking Phase 12 complete, staging, committing, or pushing.
+2. The Phase 12 manual walkthrough went well overall. Record my overall pass in docs/verification.md. Keep any steps I didn't confirm individually marked as such, and leave the outage game's title and ID unrecorded if I didn't provide them. Link only screenshots that actually exist and keep the rest marked pending.
+
+   Update PROMPTS.md and CLAUDE.md, mark Phase 12 complete in the plan, and rerun the five standard checks. Show me the results, git status --short, and the planned commit message. Stop before staging, committing, or pushing. I'll write REFLECTION.md in my own words.
+
+### Summary
+- **Outcome:** Phase 12 built and verified. All five standard checks pass with 408 tests (356 before). The user reported the manual walkthrough as one overall pass, and its steps are recorded as not confirmed individually.
+  - **`games/tests/test_acceptance_isolation.py` (12 tests):** the PRD's owner-isolation matrix in one module: website GET and CSRF-valid POST on another user's detail, edit, delete and refresh (404, nothing changed, no IGDB call, no refresh attempt); the owner's 405 on refresh; API GET, PUT, PATCH and DELETE by token and session; list, search and Theme leakage; the owner set on create; 401 and the login redirect.
+  - **`games/tests/test_acceptance_outage.py` (40 tests):** ten checks (all search fields, four filters, seven sorts, paging, detail, edit, API list and retrieve, search and refresh messages with the My Saved Games link, a stored game saving, a new game saving nothing) in four failure modes: unreachable, timeout, rate limited and credentials missing, through the real client with HTTP failing.
+  - **README:** the setup section, still marked "in progress", became a fresh-clone setup with a table of every environment variable, `DJANGO_ENV_FILE`, and the five checks. The API examples and client messages were checked against the code and already matched.
+  - **`docs/verification.md`:** about 25 line references to current code (B1's Phase 6 update, B2, B3, B4 and the Reflection Question 4 explanation) had drifted after later phases and were corrected; the historical Phase 4 references were kept as labelled. Added the Phase 12 section and the acceptance criteria sweep, which maps every PRD criterion to its tests and manual steps.
+  - **Screenshots:** none exist yet (`docs/verification/screenshots/` holds only `.gitkeep`), so none are linked. The B1, B2 and B3 before and after screenshots, the Reflection Question 4 Back-step screenshot and the Phase 11 terminal screenshots stay pending.
+- **Deviations:** the first prompt asked for a review, checklist and pointers. Claude also built the two consolidated test modules and completed the README, because the Phase 12 plan lists them as deliverables. The outage-save rerun's new game title and IGDB ID weren't reported and are left unrecorded, as the user asked. Claude didn't run the `git grep` secrets check itself, because that means reading `.env`. It gave the user a PowerShell command that prints only file names and counts.
+- **Sideways:** nothing failed. Both new modules passed on their first run. One file needed `ruff format`, and it was reformatted before the full checks.
+
 ## 2026-11-15 — Phase 11: API command-line client for listing entries and updating status
 
 ### Prompts

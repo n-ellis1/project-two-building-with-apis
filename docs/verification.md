@@ -478,6 +478,58 @@ What Phase 11 added:
 
 No bugs or usability issues were found in Phase 11.
 
+### Phase 12: Final acceptance sweep, owner isolation, IGDB outage and documentation
+
+**Result: Pass (2026-11-15).** All five standard checks pass, 408 tests (356 before Phase 12, plus
+12 owner-isolation and 40 outage tests). The user ran the Phase 12 manual walkthrough with
+`uv run python manage.py runserver`, the demo accounts and the real `.env`, and reported that it
+"went well overall". The steps weren't confirmed one by one, so each is recorded as covered by that
+overall walkthrough (not confirmed individually), with the automated tests that cover the same
+behavior. The mapping from each PRD acceptance criterion to its evidence is in the
+[Acceptance criteria sweep](#acceptance-criteria-sweep). No tokens, passwords or secret values are
+recorded here.
+
+What Phase 12 added:
+
+- `games/tests/test_acceptance_isolation.py`: the PRD's isolation matrix in one module (website GET
+  and CSRF-valid POST on detail, edit, delete and refresh; the owner's 405 on refresh; API GET, PUT,
+  PATCH and DELETE by token and session; list and search leakage; the Theme dropdown and theme IDs;
+  owner set on create; 401 and the login redirect). IGDB is patched to fail if called.
+- `games/tests/test_acceptance_outage.py`: the same ten checks in four failure modes (unreachable,
+  timeout, rate limited, credentials missing), with the real client and HTTP failing.
+- README setup completed; line references in this record rechecked against the code.
+
+| # | Step | Expected | Result | Date |
+|---|---|---|---|---|
+| 1 | Owner isolation as `demo_b` (detail, edit, delete URLs; refresh form for A's ID; Theme dropdown and `?theme=19`; search a word only in A's notes; the same in the browsable API) | 404s with A unchanged; no Horror or Survival; theme ignored; no matches; API 404 and 400 for `theme=19` | **Pass** (overall walkthrough; not confirmed individually). Automated: `test_acceptance_isolation.py` | 2026-11-15 |
+| 2 | IGDB outage (Wi-Fi off, `runserver` running): My Saved Games search, filters, sorts, paging; detail; edit and save; API list; IGDB search and refresh; [outage save rerun](#igdb-outage-saves) | Saved games all work; IGDB features show the message with the link; stored game saves, new game saves nothing | **Pass** (overall walkthrough; not confirmed individually; the new game's title and IGDB ID weren't reported). Automated: `test_acceptance_outage.py` | 2026-11-15 |
+| 3 | Restart with no IGDB credentials (`DJANGO_ENV_FILE`) | Site starts; list works | **Pass** (overall walkthrough; not confirmed individually). Automated: `StartupWithoutIgdbCredentialsTests`, `MissingCredentialsOutageTests` | 2026-11-15 |
+| 4 | CLI `update <id> Playing` on a fresh entry | Previous and updated status printed; website shows Playing | **Pass** (overall walkthrough; not confirmed individually; the entry wasn't reported). Automated: `test_entries_client_live.py` | 2026-11-15 |
+| 5 | Covers (working, missing, blocked); title-sort reverse count; browsable API with a session; client with the token | As in the sweep | **Pass** (overall walkthrough; not confirmed individually). Automated: see the sweep | 2026-11-15 |
+| 6 | Every Reflection Question 5 entry has steps, before and after screenshots and fix references | Complete, or the gaps listed | Steps and fix references present for B1–B4. **Screenshots pending:** `docs/verification/screenshots/` holds only `.gitkeep` (checked 2026-11-15), so B1, B2 and B3 before and after are still missing (B4's after is optional) | 2026-11-15 |
+
+**Screenshots still pending** (none exist yet, so none are linked): `phase4-b1-before.png`,
+`phase4-b1-after.png`, `phase6-rq4-back-step.png`, `phase7-b2-before.png`, `phase7-b2-after.png`,
+`phase7-b3-before.png`, `phase7-b3-after.png`, and the Phase 11 terminal screenshots of `list` and
+`update`.
+
+**Secrets and staging check (run by Claude, 2026-11-15, after staging the seven Phase 12 files):**
+
+- `git diff --cached --check` reported no whitespace errors.
+- `.env` and `db.sqlite3` aren't staged or tracked, and both are ignored (`.gitignore:153` and
+  `.gitignore:62`).
+- `.env.example` holds placeholders only for `DJANGO_SECRET_KEY`, `DEMO_PASSWORD`,
+  `GAME_TRACKER_TOKEN`, `IGDB_CLIENT_ID` and `IGDB_CLIENT_SECRET`.
+- **Credential scan: Pass.** A throwaway scratchpad script (not committed) loaded those five values
+  from `.env` into memory. All five were real values, not placeholders. It compared them with the
+  staged content of each file (`git show :<path>`), never passing a value as a command argument and
+  printing only pass or fail and filenames. The 7 staged files passed, and so did all 114 files in
+  the index.
+- **Not checked by this scan:** test output (covered instead by the token-never-printed tests and
+  the offline test runner), untracked or ignored files, git history, and the cached Twitch access
+  token, which is never written to disk. The user's walkthrough also didn't confirm the plan's
+  `git grep` step separately.
+
 ## Browser bugs and usability fixes (Reflection Question 5)
 
 Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** screenshot, the fix
@@ -506,11 +558,11 @@ Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** 
   an outside URL or markup, falls back to page 1 and is never echoed. The entry is still looked up
   with `get_owned_entry_or_404`. Phase 6 extends the same link to keep search, filters and sort (noted
   in the plan).
-- **Phase 6 update:** the line references above are from the Phase 4 fix. The list rows moved to
-  `games/templates/games/_saved_games_region.html:83` and `:86`, `saved_games_url()` moved to
-  `games/queries.py:215`, and the detail view now rebuilds the full list state through
-  `parse_entry_query` (`games/views.py:106`, return link built at `:121`). Tests:
-  `ReturnToSavedGamesStateTests` in `games/tests/test_entry_detail.py`.
+- **Phase 6 update (line numbers rechecked in Phase 12):** the line references above are from the
+  Phase 4 fix. The list rows moved to `games/templates/games/_saved_games_region.html:88` and `:91`,
+  `saved_games_url()` moved to `games/queries.py:329`, and the detail view now rebuilds the full list
+  state through `parse_entry_query` (`games/views.py:132`, return link built at `:141`). Tests:
+  `ReturnToSavedGamesStateTests` in `games/tests/test_entry_detail.py:111`.
 - **Retest after the fix (2026-11-15):**
 
   | Step | Expected | Result |
@@ -552,13 +604,13 @@ Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** 
   use the matched term so Next doesn't jump back to the original search. Both requests carry the
   eligibility `where` clause. If the original request errors, the existing error message is shown
   and no second request is made.
-- **Fix:** `roman_numeral_variant()` (`games/queries.py:229`, moved there from `games/views.py`
-  in B3 so My Saved Games shares it) turns a final standalone 2–9 into its Roman numeral. The
-  `search` view (`games/views.py:177`) runs the exact search first and, only for an empty page 1
-  with such a variant, makes one more request (`games/views.py:204`). When that
-  finds results, the matched term becomes the search for the box, the pager links and
+- **Fix** (line numbers rechecked in Phase 12): `roman_numeral_variant()` (`games/queries.py:300`,
+  moved there from `games/views.py` in B3 so My Saved Games shares it) turns a final standalone 2–9
+  into its Roman numeral. The `search` view (`games/views.py:237`) runs the exact search first and,
+  only for an empty page 1 with such a variant, makes one more request (`games/views.py:266`). When
+  that finds results, the matched term becomes the search for the box, the pager links and
   `HX-Push-Url`, and the notice "No matches for “…”. Showing results for “…”." is shown
-  (`games/templates/games/_search_region.html:17`). Both requests go through
+  (`games/templates/games/_search_region.html:16`–`18`). Both requests go through
   `igdb.search_games`, so both carry the eligibility clause. An error on the exact search is shown
   with no second request.
 - **After screenshot:** **pending reflection evidence.** Expected as
@@ -593,12 +645,13 @@ Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** 
   on the whole filtered list before paging, so an empty or out-of-range page can't switch the search.
   Stay in SQLite and scoped to the signed-in user's entries, keep filters, sorting and paging, and say
   which term matched.
-- **Fix:**
+- **Fix** (line numbers rechecked in Phase 12):
   - The rule moved to `games/queries.py` so both pages share it: `roman_numeral_variant()`
-    (`:229`) and the new `resolve_saved_search()` (`:242`), which tries the typed term under the
+    (`:300`) and the new `resolve_saved_search()` (`:313`), which tries the typed term under the
     active filters and, only if it matches nothing, the Roman-numeral form, each with `.exists()`
-    on the user's own filtered entries. Search IGDB imports the same function.
-  - `saved_games_context()` paginates the resolved query (`games/views.py:64`). The URL, the
+    on the user's own filtered entries. Search IGDB imports the same function, and the Phase 10
+    API list calls `resolve_saved_search()` the same way.
+  - `saved_games_context()` paginates the resolved query (`games/views.py:67`–`68`). The URL, the
     search box, the pager, Clear filters, detail links and `HX-Push-Url` keep the **typed** term, so
     URL, controls and results still agree on every request (Reflection Question 4) and every page of
     the same URL resolves the same way.
@@ -637,7 +690,7 @@ Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** 
 - **Before screenshot:** **not applicable.** It was found in code and tests and fixed before any
   browser run, so no browser screenshot exists. The failing test is the evidence (below).
 - **Fix:** when the page's own error is the same text as a queued flash message, the page leaves its
-  alert out (`games/views.py:266`–`267`). The template now chooses between the error view and the
+  alert out (`games/views.py:324`–`325`, rechecked in Phase 12). The template now chooses between the error view and the
   details view by whether a game loaded (`games/templates/games/igdb_game.html:6`), and shows its
   own alert only when there's an error to show (`:8`). With no pending message, the page still shows
   its own error.
@@ -658,27 +711,29 @@ unverified in the browser (no issue reported).
 
 ### How the URL stays the single source of query state
 
+Line numbers rechecked against the code in Phase 12.
+
 1. **Parse:** every request's query string goes through one forgiving parser,
-   `parse_entry_query()` (`games/queries.py:141`), into an `EntryQuery` (`games/queries.py:100`).
+   `parse_entry_query()` (`games/queries.py:150`), into an `EntryQuery` (`games/queries.py:103`).
    Unknown or another user's values are dropped. The page is parsed by `parse_page()` and clamped by
    `Paginator.get_page()`.
-2. **Query and render:** `saved_games_context()` (`games/views.py:44`) runs `saved_entries()`
-   (`games/queries.py:189`) and builds the controls, results, pager, Clear filters and detail links
+2. **Query and render:** `saved_games_context()` (`games/views.py:54`) runs `saved_entries()`
+   (`games/queries.py:261`) and builds the controls, results, pager, Clear filters and detail links
    from that one `EntryQuery`. The controls are in the swapped region with the results
-   (`games/templates/games/_saved_games_region.html`: search box `:19`, Status `:27`, Platform
-   Played `:36`, Favorite `:44`, Theme `:52`, sort `:60`, Clear filters `:67`, pager `:105` and
-   `:109`). A swap therefore replaces the controls and results together.
+   (`games/templates/games/_saved_games_region.html`: search box `:19`, Status `:24`, Platform
+   Played `:33`, Favorite `:42`, Theme `:49`, sort `:58`, Clear filters `:67`, pager `:110` and
+   `:114`). A swap therefore replaces the controls and results together.
 3. **Push the URL:** the region carries `hx-target`, `hx-swap="outerHTML"` and `hx-push-url="true"`
    (`_saved_games_region.html:8-9`), and the form and links use `hx-get`. The view answers an
    ordinary HTMX request with only the region and an `HX-Push-Url` header holding the clean URL of
-   what is actually shown (`games/views.py:97`, built by `saved_games_url()` at
-   `games/queries.py:215`).
+   what is actually shown (`games/views.py:115`, built by `saved_games_url()` at
+   `games/queries.py:329`).
 4. **History restores:** the page sets `hx-history="false"` outside the region
    (`games/templates/games/saved_games.html:11`), so HTMX never snapshots private entries or notes
    into localStorage. Every Back or Forward is a cache miss, which HTMX 2.0.11 answers by requesting
    the URL with `HX-Request` and `HX-History-Restore-Request`. `is_htmx_swap()`
-   (`games/views.py:71`) treats that as a full-page request, so the restored body is rendered fresh
-   from the URL. `Vary: HX-Request, HX-History-Restore-Request` (`games/views.py:101`) stops the
+   (`games/views.py:89`) treats that as a full-page request, so the restored body is rendered fresh
+   from the URL. `Vary: HX-Request, HX-History-Restore-Request` (`games/views.py:119`) stops the
    browser cache from handing a partial to a full-page load.
 
 Automated coverage: `games/tests/test_saved_games_htmx.py` (full page, region-only partial and
@@ -737,6 +792,7 @@ it with the same search.
 | Date | Variant | Search | Existing game | New game | Result |
 |---|---|---|---|---|---|
 | 2026-11-15 | Wi-Fi off and dummy credentials (as listed in the checklist) | `Dark Souls III` (as suggested) | Dark Souls III (11133) | Not recorded (title and IGDB ID weren't reported) | Overall Pass reported by the user ("looked good"); individual steps unverified in the browser |
+| 2026-11-15 (Phase 12) | Wi-Fi off (Phase 12 step 2) | `Dark Souls III` (as suggested; not confirmed individually) | Dark Souls III (11133) | Not recorded (title and IGDB ID weren't reported) | Overall Pass reported by the user ("went well overall"); individual steps not confirmed |
 
 Automated mirror: `games/tests/test_search_save.py` `OutageSaveCheckTests` renders `demo_b`'s results
 with one stored and one new game, makes the IGDB client fail, and posts both loaded forms: the stored
@@ -745,6 +801,59 @@ Theme, link and Entry count is unchanged.
 
 ## Acceptance criteria sweep
 
-Filled in during Phase 12: each PRD acceptance criterion mapped to its steps and a pass/fail result.
+Each PRD acceptance criterion, its automated evidence and its manual step. **Automated** results
+are from the Phase 12 run on 2026-11-15 (all five standard checks pass, 408 tests). **Manual**
+steps are numbered as in the plan's Phase 12 "Manual verification". The user reported the Phase 12
+walkthrough as one overall pass on 2026-11-15, so "Manual: Pass (P12 overall)" means covered by that
+walkthrough, not confirmed individually. Earlier manual passes are listed where they exist.
 
-_Not started (Phase 12)._
+### Owner isolation
+
+| Criterion | Automated evidence | Manual step | Result |
+|---|---|---|---|
+| As B, GET A's detail, edit and delete pages → 404 | `test_acceptance_isolation.py` `test_get_of_as_detail_edit_and_delete_pages_is_404_like_a_missing_id`; also `test_entry_detail.py`, `test_entry_edit.py`, `test_entry_delete.py` | P12 step 1 (earlier: Phase 4 D1, Phase 5 E1) | Automated: Pass. Manual: Pass (P12 overall) |
+| As B, POST to A's delete and refresh (and edit) → 404; A unchanged, no IGDB call, no refresh attempt | `test_csrf_valid_posts_to_as_edit_delete_and_refresh_are_404_and_change_nothing`; `RefreshAccessTests` | P12 step 1 | Automated: Pass. Manual: Pass (P12 overall) |
+| Owner's GET on own refresh URL → 405, nothing changes | `test_refresh_is_post_only_even_for_the_owner`; `RefreshAccessTests` | — (automated only) | Automated: Pass |
+| B's token or session: API GET, PUT, PATCH, DELETE on A's entry → 404, A unchanged | `ApiIsolationTests.test_get_put_patch_delete_on_as_entry_are_404_and_change_nothing`; `test_api_access.py` `OwnerIsolationTests` | P12 step 1 (browsable API; earlier: Phase 10 step 5) | Automated: Pass. Manual: Pass (P12 overall) |
+| B's website and API lists never include A's entries, including a search for A-only notes | `test_bs_list_and_search_never_show_as_entries`, `test_bs_api_list_and_search_never_include_as_entries` | P12 step 1 | Automated: Pass. Manual: Pass (P12 overall) |
+| B's Theme dropdown has no A-only theme; A's theme ID ignored on the website, 400 in the API | `test_bs_theme_dropdown_lists_only_bs_themes_and_as_theme_id_is_ignored`, `test_as_theme_id_is_400_on_bs_api_list`; `QueryStateIsolationTests` | P12 step 1 | Automated: Pass. Manual: Pass (P12 overall) |
+| Create sets the owner to the authenticated user even if another owner is sent | `test_saving_from_search_sets_the_owner_to_the_signed_in_user`, `test_create_sets_the_owner_from_the_token_even_if_another_owner_is_posted` | — (automated only) | Automated: Pass |
+| Unauthenticated API → 401; signed-out website → login, then back to the page | `test_unauthenticated_requests_are_401`, `test_signed_out_visitor_is_sent_to_login_and_returned_to_the_page`; `ProtectedPageTests` | Earlier: Phase 2 steps 3 and 6, Phase 10 step 7 | Automated: Pass. Manual: Pass (Phases 2 and 10) |
+
+### Browsing saved games during an IGDB outage
+
+`games/tests/test_acceptance_outage.py` runs the same ten checks in four modes: unreachable,
+timeout, rate limited and credentials missing (40 tests, the real IGDB client with HTTP failing).
+
+| Criterion | Automated evidence | Manual step | Result |
+|---|---|---|---|
+| My Saved Games shows titles, platforms, badges and tracking data; search (all six fields), four filters, seven sorts and pagination work | `test_my_saved_games_shows_titles_platforms_badges_and_tracking_data`, `test_search_across_every_field`, `test_each_of_the_four_filters`, `test_all_seven_sorts_and_pagination` | P12 step 2 | Automated: Pass. Manual: Pass (P12 overall) |
+| Detail and edit pages load and save; failed covers show the placeholder with all text visible | `test_detail_and_edit_pages_load_and_save`; the fallback script itself is browser only | P12 steps 2 and 5 (earlier: Phase 4 C1–C8, blocked covers) | Automated: Pass. Manual: covers Pass (Phase 4); outage Pass (P12 overall) |
+| API list and retrieve work | `test_api_list_and_retrieve` | P12 step 2 | Automated: Pass. Manual: Pass (P12 overall) |
+| IGDB search and refresh show the message with the My Saved Games link | `test_igdb_search_shows_the_message_with_the_link_and_keeps_the_text`, `test_refresh_shows_the_message_with_the_link_and_changes_nothing` | P12 step 2 | Automated: Pass. Manual: Pass (P12 overall; Phase 9 step 6 wasn't confirmed) |
+| A locally stored game still saves; a new game fails (503 in the API) with nothing partly saved | `test_website_saves_a_stored_game_and_a_new_game_saves_nothing`, `test_api_saves_a_stored_game_and_refuses_a_new_one_with_503`; `OutageSaveCheckTests` | P12 step 2 ([IGDB outage saves](#igdb-outage-saves) rerun) | Automated: Pass. Manual: Pass (Phase 8 and P12 overall; new game not recorded) |
+| Django starts without IGDB credentials | `test_startup.py` `StartupWithoutIgdbCredentialsTests`; `MissingCredentialsOutageTests` | P12 step 3 (earlier: Phase 2 step 9) | Automated: Pass. Manual: Pass (Phase 2; P12 overall) |
+
+### Command-line client before-and-after status update
+
+| Criterion | Automated evidence | Manual step | Result |
+|---|---|---|---|
+| `update <id> Playing` prints the previous and updated status from the PATCH response | `test_entries_client_live.py` `test_update_prints_before_and_after_and_changes_only_status`; `UpdateReportsServerStatusBeforeAndAfterTests` | P12 step 4 (earlier: Phase 11 step 3, entry 13) | Automated: Pass. Manual: Pass (Phase 11; P12 overall) |
+| Website then shows Playing; no other tracking field changed | Same live-server test (all eight tracking fields compared) | P12 step 4 | Automated: Pass. Manual: Pass (Phase 11; P12 overall) |
+| Another user's ID or a missing ID → not found; invalid status → validation error; bad token → token error; stopped server → "Server unavailable"; token never printed | `test_update_failures_change_nothing`, `test_bad_token_and_stopped_server`; `TokenNeverPrintedTests` | Earlier: Phase 11 step 5 (overall walkthrough) | Automated: Pass. Manual: Pass (overall, Phase 11) |
+| `list` matches the API's count and first page for the same search and status | `test_list_matches_the_api_for_the_same_search_and_status` | Earlier: Phase 11 step 2 | Automated: Pass. Manual: Pass (Phase 11) |
+
+### Other verification carried from the design
+
+| Criterion | Automated evidence | Manual step | Result |
+|---|---|---|---|
+| IGDB Game Category field and values verified before implementation | — | Phase 1 ([research note](research/igdb-game-types.md)) | Pass (2026-11-14) |
+| Repeated identical IGDB searches give consistent pages 1 and 2 | — | Phase 7 [live client ordering check](#live-client-ordering-check-2026-11-15) | Pass, with the recorded known limitation |
+| Browsable API works with a session; the client works with a token | `test_website_session_works_including_the_browsable_api`; `test_entries_client_live.py` | P12 step 5 (earlier: Phases 10 and 11) | Automated: Pass. Manual: Pass (Phases 10 and 11; P12 overall) |
+| A search matching several related values shows the entry once | `test_saved_entries_query.py` `test_an_entry_matching_through_several_related_rows_appears_once` | Phase 6 S3 (unverified in the browser) | Automated: Pass |
+| Reversing the title sort keeps the total; ties across a page boundary repeat or skip nothing | `test_reversing_the_title_sort_with_the_same_search_and_filters_keeps_the_count`, `test_rating_highest_first_unrated_last_ties_by_title_then_id_across_pages` | P12 step 5 | Automated: Pass. Manual: Pass (P12 overall) |
+| Page helper: page 1 for missing, empty, non-numeric, decimal, zero and negative; last page past the end | `test_queries.py` `ParsePageTests`; `test_a_page_past_the_end_shows_the_last_filtered_page` | Phase 3 step 4 | Automated: Pass. Manual: Pass (Phase 3) |
+| Token handling: cached token reused, refetched after expiry, one 401 refresh and retry, no second retry, saved games work without credentials | `test_igdb_client.py` `TokenReuseAndRetryTests`, `TokenRegressionTests`; `MissingCredentialsOutageTests` | — (automated only) | Automated: Pass |
+| Covers: working, missing and blocked each display correctly | `test_covers.py` | P12 step 5 (earlier: Phase 4 A, B, C) | Automated: Pass. Manual: Pass (Phase 4; P12 overall) |
+| PATCH checks a new finish date against the stored start date; stale-platform rules on website and API | `test_finish_date_before_stored_start_date_is_a_field_error`, `StalePlatformUpdateTests`; `test_entry_edit.py` stale-platform tests | Phase 5 C1–C3, Phase 10 step 4 | Automated: Pass. Manual: Pass |
+| A refresh that makes a game ineligible stores both values, keeps entries, and later saves are refused from the stored values with no IGDB call | `test_refresh.py` `ReclassifyingRefreshTests` | — (automated only; needs IGDB to reclassify a game) | Automated: Pass |

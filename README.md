@@ -1,18 +1,52 @@
 # project-two-building-with-apis
 
-## Django game tracker (in progress)
+## Django game tracker
 
-From the repo root in PowerShell, after `uv sync` and creating `.env` from `.env.example` (see step 2 below):
+A signed-in user searches IGDB, saves games to a private list, and tracks status, favorite, rating, notes, platform played, dates and hours played. Saved game details are stored in SQLite, so the list stays browsable when IGDB is down. The same entries are available through a token-authenticated REST API and a small command-line client. Each user sees only their own entries: another user's entry ID always returns `404`.
 
-1. Set `DJANGO_SECRET_KEY` in `.env` to a long random string (`.env.example` shows a command that generates one) and `DJANGO_DEBUG=True` for local development. The IGDB variables are optional for the site.
-2. Create the database and start the server:
+Stack: Python 3.14, Django 6.1, Django REST Framework, SQLite, Bootstrap and HTMX served as local static files (no CDN, no Node), managed with [uv](https://docs.astral.sh/uv/).
 
-   ```powershell
-   uv run python manage.py migrate
-   uv run python manage.py runserver   # http://127.0.0.1:8000/
-   ```
+### Setup from a fresh clone
 
-Optional: `uv run python manage.py createsuperuser` for `/admin/`. Full setup docs are completed in Phase 12.
+From the repo root in PowerShell:
+
+```powershell
+uv sync                          # create .venv and install dependencies from uv.lock
+Copy-Item .env.example .env      # create your local, git-ignored .env
+git check-ignore -v -- .env      # confirm .env is ignored (prints the matching .gitignore rule)
+notepad .env                     # fill in the values below, then save
+uv run python manage.py migrate
+uv run python manage.py runserver   # http://127.0.0.1:8000/
+```
+
+Then sign up at <http://127.0.0.1:8000/accounts/signup/>, or load the [demo data](#demo-data). Optional: `uv run python manage.py createsuperuser` for `/admin/`.
+
+### Environment variables
+
+All of them go in `.env` (git-ignored; `.env.example` has placeholders only). Variables already set in the shell win over `.env`. Never commit `.env` or paste its values into docs or screenshots.
+
+| Variable | Needed for | Value |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | Django (required: it won't start without it) | A long random string. Generate one with `uv run python -c "import secrets; print(secrets.token_urlsafe(50))"` |
+| `DJANGO_DEBUG` | Local development | `True`, so `runserver` serves the static files (default `False`) |
+| `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` | Search IGDB, saving new games, Refresh, the Popular row | Your Twitch application's Client ID and Client Secret (see [Register a Twitch application](#1-register-a-twitch-application)). Optional: without them the site starts, your saved games work, and IGDB features show "Game search and imports aren't set up on this server." |
+| `DEMO_PASSWORD` | `seed_demo` only | The password for the `demo_a` and `demo_b` accounts |
+| `GAME_TRACKER_TOKEN` | `scripts/entries_client.py` and PowerShell API calls | An API token (see [Create a token](#create-a-token)) |
+| `GAME_TRACKER_API_URL` | `scripts/entries_client.py` (optional) | The API root, default `http://127.0.0.1:8000/api/` |
+
+`DJANGO_ENV_FILE` (set in the shell, never in `.env`) makes Django load a different env file instead of `.env`. Use it to check the site with no IGDB credentials: in Windows PowerShell 5.1, `$env:IGDB_CLIENT_ID = ""` deletes the variable and `.env` fills it back in.
+
+### Running the checks
+
+```powershell
+uv run python manage.py check
+uv run python manage.py makemigrations --check --dry-run
+uv run python manage.py test        # never contacts IGDB or Twitch
+uv run ruff check .
+uv run ruff format --check .
+```
+
+The tests run offline: the test runner blanks the IGDB credentials and blocks real HTTP requests, so they're safe with your real `.env` in place. Manual verification results are in [docs/verification.md](docs/verification.md).
 
 ### Demo data
 
