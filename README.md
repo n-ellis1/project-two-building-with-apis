@@ -153,6 +153,46 @@ Content-Type: application/json
 
 In PowerShell: `Invoke-RestMethod "${api}42/" -Method Patch -Headers $headers -ContentType "application/json" -Body '{"status": "completed"}'`.
 
+### Command-line client
+
+`scripts/entries_client.py` lists your saved games and changes one entry's status through the API. It uses only `requests` and `python-dotenv` and imports no Django code, so it checks the API from outside the app.
+
+**Setup:** create a token (see [Create a token](#create-a-token)) and store it in `.env` as `GAME_TRACKER_TOKEN`. `GAME_TRACKER_API_URL` is optional and defaults to `http://127.0.0.1:8000/api/`. Variables already set in the shell win over `.env`. The client sends the token only in the `Authorization` header and never prints it.
+
+Start the server (`uv run python manage.py runserver`), then in another terminal from the repo root:
+
+```powershell
+uv run scripts/entries_client.py list
+uv run scripts/entries_client.py list --status want_to_play
+uv run scripts/entries_client.py list --q "dark souls" --status "Want to Play" --page 2
+uv run scripts/entries_client.py update 7 Playing
+```
+
+- **`list`** shows one page of 10: each entry's ID, status and game title, the total number of matches and whether another page exists. `--q` (alias `--search`) searches the same fields as My Saved Games, `--status` filters by status and `--page` picks the page (default 1).
+- **`update <id> <status>`** GETs the entry, PATCHes only its `status`, then prints the previous status (from the GET) and the updated status (from the PATCH response). Nothing else on the entry changes.
+- **Statuses:** `want_to_play`, `playing`, `completed`, `on_hold`, `dropped`, or their labels (`Playing`, `"Want to Play"`, `On Hold`), in any case. Anything else is sent unchanged, and the API's validation error is printed.
+
+Example (`update`):
+
+```text
+Entry 7: Hollow Knight
+Previous status: Want to Play
+Updated status:  Playing
+```
+
+**Errors** go to stderr, prefixed with `Error:`:
+
+| Situation | Message |
+|---|---|
+| Missing token | `Missing GAME_TRACKER_TOKEN. …` |
+| Invalid token (`401`) | `The API rejected GAME_TRACKER_TOKEN (HTTP 401). …` |
+| Server not running | `Server unavailable: could not connect to …` |
+| Invalid status or other field (`400`) | `The API rejected the request:` and the API's field errors |
+| Missing ID or another user's entry (`404` on update) | `Entry <id> not found. It doesn't exist or isn't one of your entries.` (nothing is changed) |
+| Page past the end (`404` on list) | `Page <n> not found (invalid page): …` |
+
+**Exit codes:** `0` success, `1` configuration, request or API error, `2` usage error (for example a missing status or a non-numeric ID).
+
 ## IGDB verification script
 
 `scripts/igdb_search.py` searches [IGDB](https://www.igdb.com) for games by title and prints each match's title, IGDB ID, release date (UTC) and platforms, up to 10 results per page. It confirms that real API requests work before the Django game tracker is designed. Background research is in [docs/research/game-api-comparison.md](docs/research/game-api-comparison.md).

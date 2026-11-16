@@ -420,6 +420,64 @@ What Phase 10 added:
 
 No browser bugs or usability issues were found in Phase 10.
 
+### Phase 11: Command-line client (lesson checkpoint)
+
+**Result: Pass (2026-11-15).** Automated checks: all five standard checks pass, 356 tests (26 client
+unit tests with mocked HTTP, plus 5 end-to-end tests that run `scripts/entries_client.py` as a
+subprocess against Django's live server and a test database). The user ran the walkthrough with
+`uv run python manage.py runserver` and the token stored in the git-ignored `.env` as
+`GAME_TRACKER_TOKEN`. The client read it from there itself, so it was never typed or echoed. It
+doesn't appear in this record, the README or any screenshot.
+
+**Confirmed individually by the user:**
+
+- `uv run scripts/entries_client.py list --status want_to_play` returned four Want to Play entries
+  and reported no next page.
+- `uv run scripts/entries_client.py update 13 Playing` updated entry 13, *Dark Souls III: The Ringed
+  City*, taken from that Want to Play list, to Playing.
+- The website then showed Playing for entry 13.
+
+**Covered by the overall walkthrough** ("the rest of the walkthrough seemed good"; not reported one
+by one) **and by automated tests:** the comparison with `/api/entries/?status=want_to_play`, the
+printed before and after lines and exit code 0, the other tracking fields staying unchanged, and the
+error paths in step 5.
+
+| # | Step | Expected | Result | Date |
+|---|---|---|---|---|
+| 1 | Start `runserver`; note a demo entry at Want to Play | An entry to update | **Pass** (confirmed: entry 13, *Dark Souls III: The Ringed City*) | 2026-11-15 |
+| 2 | `list`, then `list --status want_to_play`; compare with `/api/entries/?status=want_to_play` in the browser | Same total and first-page entries as the API; "Another page" matches `next` | **Pass.** Confirmed: four Want to Play entries, no next page. The browser comparison was covered by the overall walkthrough. Automated: `test_list_matches_the_api_for_the_same_search_and_status` (count, IDs in order and next page against the API for no filter, status, and search plus status), `test_list_second_page_and_invalid_page`, `ListTests` | 2026-11-15 |
+| 3 | `update 13 Playing` | `Previous status: Want to Play`, `Updated status:  Playing`; `$LASTEXITCODE` 0 | **Pass.** Confirmed: the update ran. The printed lines and exit code were covered by the overall walkthrough. Automated: `test_update_prints_before_and_after_and_changes_only_status` (live server), `UpdateReportsServerStatusBeforeAndAfterTests` (GET before PATCH, PATCH body exactly `{"status": "playing"}`, labels from the GET and PATCH responses) | 2026-11-15 |
+| 4 | Reload entry 13's detail page and My Saved Games | Playing; other fields unchanged | **Pass.** Confirmed: the website showed Playing. Other fields unchanged was covered by the overall walkthrough. Automated: the live-server update test compares all eight tracking fields in the database before and after | 2026-11-15 |
+| 5 | Update with the other demo user's entry ID and with `999999`; an invalid status; `$env:GAME_TRACKER_TOKEN = "invalid-token"` (then `Remove-Item Env:GAME_TRACKER_TOKEN`); the server stopped | Not found (exit 1, nothing changed); validation error; token error; "Server unavailable"; the token never shown | **Pass** (overall walkthrough; not reported one by one). Automated: `test_update_failures_change_nothing` and `test_bad_token_and_stopped_server` (live server, the token asserted absent from every output), `UpdateMissingEntryChangesNothingTests`, `TokenNeverPrintedTests`, `UpdateMoreTests`, `UsageErrorTests` | 2026-11-15 |
+| 6 | Terminal screenshots of steps 2 and 3 for the lesson checkpoint, with no token visible | Screenshots in `verification/screenshots/` | **Pending:** no Phase 11 screenshots are in [`verification/screenshots/`](verification/screenshots/) yet | — |
+
+Automated-only checks (no manual step):
+
+- **Configuration:** `GAME_TRACKER_API_URL` defaults to `http://127.0.0.1:8000/api/` when unset or
+  blank, and an override works with or without a trailing slash. `.env` is read from the repo root. A
+  missing or blank `GAME_TRACKER_TOKEN` exits 1 before any request (`ConfigurationTests`).
+- **Token safety:** a fake token inside a 400 error body, a 401 or 404 body, or the text of a
+  connection, timeout or other request exception never reaches stdout or stderr, while it is still
+  sent as `Authorization: Token …` (`TokenNeverPrintedTests`, `UpdateMoreTests`).
+- **Other errors:** 403, 500 and 503 on the GET exit 1 with no PATCH; a 400 with no usable body gets
+  a fixed message; a success body that isn't a JSON object, or has no `count` or `results`, is an
+  "unexpected response".
+- **Exit codes:** 0 on success, 1 for configuration, request and API errors, 2 for eight kinds of
+  bad command line, none of which sends a request (`UsageErrorTests`).
+- **Status input:** labels and values in any case, with spaces, hyphens or underscores, are sent as
+  the API value, and anything unrecognized is sent unchanged so the API's validation decides. The
+  client's status list matches `Entry.Status.choices` (`StatusLabelsMatchModelTests`).
+- **Independence:** the script imports no Django, DRF or `games` code (`NoDjangoImportTests`).
+
+What Phase 11 added:
+- `scripts/entries_client.py`: `list` (`--q`/`--search`, `--status`, `--page`) and
+  `update <id> <status>`, using only `requests` and `python-dotenv`, with fixed error messages,
+  exit codes 0/1/2, and the configured token scrubbed from all output.
+- A `GAME_TRACKER_API_URL` placeholder in `.env.example`; the README's "Command-line client"
+  section.
+
+No bugs or usability issues were found in Phase 11.
+
 ## Browser bugs and usability fixes (Reflection Question 5)
 
 Each entry: ID, phase, exact reproduction steps, expected vs actual, **before** screenshot, the fix

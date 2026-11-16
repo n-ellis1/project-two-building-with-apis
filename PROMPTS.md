@@ -28,6 +28,62 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-15 — Phase 11: API command-line client for listing entries and updating status
+
+### Prompts
+1. `/implement` Read CLAUDE.md, prd/video-game-tracker.md, and Phase 11 of plans/video-game-tracker.md. Implement Phase 11 only: scripts/entries_client.py.
+
+   Follow the approved plan and pause at the TDD checkpoints. The list command should send the supported query parameters and print entries and pagination information. The update command should GET the entry, PATCH only status, and print the before and after values. Read the API URL and token from the environment as planned, and keep real tokens out of output and test logs.
+
+   Run the five standard checks and give me exact PowerShell commands to verify both commands against the running server. Include checking that the updated status appears on the website. Pause for my manual verification before marking Phase 11 complete, staging, committing, pushing, or starting Phase 12.
+2. I approve all three Phase 11 TDD behaviors and both design choices. Start with the update success test. Verify that the script GETs the entry before sending PATCH, that PATCH sends exactly {"status": "playing"}, and that the before and after labels come from the GET and PATCH responses respectively. Include a case where the PATCH response status differs from the submitted value, so the test proves the script reports what the server returned.
+
+   Keep the script independent of Django and isolate the tests from my real .env and token. For the later token-safety tests, include a fake token in an API error body and in a request exception to verify that neither leaks to stdout or stderr.
+
+   Run the focused update test, show me the RED result, and pause before implementing.
+3. I approve the update RED tests as written. Implement run_update so it GETs the entry first, PATCHes only status using the normalized API value, and prints the previous status from the GET response and the updated status from the PATCH response.
+
+   Rerun the two focused tests and show me the GREEN result. Pause before starting the missing-entry cycle.
+4. I accept the update GREEN result. Start the missing-entry cycle. Mock a 404 from GET and verify that update exits with code 1, prints a clear not-found error to stderr, prints no success output, and makes exactly one request: the GET. Use the same error for a missing entry and one owned by another user.
+
+   Run the focused test, show me the RED result, and pause before implementing the error handling.
+5. I approve the missing-entry RED test and the proposed error message. Check the GET response before sending PATCH. If GET returns 404, print the agreed message to stderr, leave stdout empty, exit with code 1, and send no PATCH. Use the same message for both cases.
+
+   Rerun the focused missing-entry test and the update success tests. Show me the GREEN result, then pause before starting the token-safety cycle.
+6. I accept the missing-entry GREEN result. Start the token-safety cycle. Use fake credentials and mocked HTTP. Verify that the client sends the fake token in the Authorization header, but never prints it to stdout or stderr.
+
+   Include a 400 response with the fake token embedded in an error message and a connection exception containing the fake token in its text. Also cover 401 and 404. Check that each failure exits with code 1 and still gives a useful error. Keep the tests isolated from my real .env.
+
+   Run the focused tests, show me the RED result, and pause before implementing the remaining error handling.
+7. I approve the token-safety RED test. Implement the error handling so a 401 gives a clear GAME_TRACKER_TOKEN message, a 400 shows the API's field error with the token redacted, and other unsuccessful responses exit with code 1. A failed GET should always stop before PATCH. A failed PATCH should print no success output.
+
+   Keep network errors as fixed messages and redact the configured token from all client output. Rerun the token-safety, missing-entry, and successful update tests. Show me the GREEN result, then pause before implementing list and the remaining Phase 11 work.
+8. I accept the token-safety GREEN result. Finish Phase 11 as proposed. Implement list with the agreed --q, --status, and --page options. Send the supplied values as query parameters and print entry IDs, game titles, statuses, the total match count, and whether another page is available. Give a clear invalid-page message for a list 404.
+
+   Add the remaining tests, including status-choice parity, URL default and override, missing token, usage exit codes, and the live-server subprocess test. Use the test database and a test-generated token for the subprocess, isolated from my real .env.
+
+   Update the README and .env.example with the API URL default and token placeholder. Run all five standard checks. Give me exact PowerShell commands to list my entries and update one status against the running server, then check that the new status appears on the website. Keep real tokens out of the commands and output.
+
+   Stop for my manual verification before marking Phase 11 complete, staging, committing, pushing, or starting Phase 12.
+9. I verified the Phase 11 CLI manually. The filtered list returned four Want to Play entries and no next page. I updated entry 13, Dark Souls III: The Ringed City, to Playing and confirmed the website showed the new status. The rest of the walkthrough seemed good. Record the overall result in docs/verification.md, and distinguish the checks I confirmed individually from those covered by automated tests. Link any screenshots present and mark missing ones as pending. Keep the token out of the records.
+
+   Update PROMPTS.md and CLAUDE.md, mark Phase 11 complete in the plan, and rerun the five standard checks. Show me the results, git status --short, and the planned commit message. Stop before staging, committing, pushing, or starting Phase 12.
+
+### Summary
+- **Outcome:** Phase 11 built and verified. The user confirmed the filtered list (four Want to Play entries, no next page) and the entry 13 update shown on the website individually, and the rest of the walkthrough as one overall pass. The terminal screenshots are pending.
+  - **`scripts/entries_client.py`**, using only `requests` and `python-dotenv` and importing no Django code: `list` (`--q`/`--search`, `--status`, `--page`) and `update <id> <status>`. It reads `GAME_TRACKER_TOKEN` and `GAME_TRACKER_API_URL` (default `http://127.0.0.1:8000/api/`) from the environment or `.env`, uses fixed error messages and exit codes 0/1/2, and scrubs the token from every printed message.
+  - **Three approved TDD cycles**, each RED on an assertion first:
+    - **Update before and after:** GET before PATCH, a PATCH body of exactly `{"status": "playing"}`, and labels from the GET and PATCH responses, including a case where the server returns values different from what was typed.
+    - **Missing entry:** a 404 from the GET exits 1 with one not-found message for a missing ID and another user's entry, with no PATCH and empty stdout.
+    - **Token safety:** with a fake token in 401, 400 and 404 bodies and in a connection exception's text, the token is sent in the header but never printed.
+  - **Built normally:** `list` and its output, the 401/400/other-status handling, status normalization, the `STATUS_LABELS` parity test, configuration tests, usage exit codes, a check that the script imports no Django code, and 5 live-server subprocess tests against a test database with a test token. README section and a `GAME_TRACKER_API_URL` placeholder. 356 tests.
+- **Deviations:** the `/implement` skill wasn't available in this session, so the request was followed directly with the `tdd` skill. The user added the case where the PATCH response differs from the input, and the token in an error body and in an exception text. The search option was first built as `--search`; the user referred to it as `--q`, so `--q` (the API's parameter name) became the main option and `--search` stayed as an alias. No follow-up questions were asked.
+- **Sideways:**
+  - The first update RED run had one ERROR (an `IndexError` on `http.calls[1]`) instead of a FAIL. A method-order assertion was added first as a mechanical repair.
+  - The first token-safety RED run crashed in `status_label` (a list from the 400 body used as a dictionary key). That was fixed as scaffolding so the subtest failed on its exit-code assertion. The connection and 404 subtests already passed at RED, because the earlier code already used fixed messages for both.
+  - Ruff reformatted a few lines (quote style, joined strings) and flagged a one-letter variable `l` (E741); each was fixed and the tests rerun.
+  - The live-server test first duplicated the subprocess setup for the stopped-server case; it was folded into one `run_client()` helper.
+
 ## 2026-11-15 — Phase 10: Token-authenticated saved-entry REST API
 
 ### Prompts

@@ -733,10 +733,10 @@ The README covers creating a token for a user with DRF's token command, storing 
 
 ### Acceptance criteria
 
-- [ ] **Checkpoint:** for an entry at Want to Play, `update <id> Playing` prints the previous status (Want to Play) and the updated status (Playing) from the PATCH response. The website detail page and My Saved Games then show Playing, and no other tracking field changed.
-- [ ] `list` shows the same total count and first-page entries as `/api/entries/` for the same search and status, and reports whether another page exists.
-- [ ] Another user's entry ID or a missing ID prints "not found" and changes nothing. An invalid status prints the validation error. A bad token prints a token error. A stopped server prints "server unavailable". None of these print the token.
-- [ ] Exit codes match the convention.
+- [x] **Checkpoint:** for an entry at Want to Play, `update <id> Playing` prints the previous status (Want to Play) and the updated status (Playing) from the PATCH response. The website detail page and My Saved Games then show Playing, and no other tracking field changed.
+- [x] `list` shows the same total count and first-page entries as `/api/entries/` for the same search and status, and reports whether another page exists.
+- [x] Another user's entry ID or a missing ID prints "not found" and changes nothing. An invalid status prints the validation error. A bad token prints a token error. A stopped server prints "server unavailable". None of these print the token.
+- [x] Exit codes match the convention.
 
 ### Automated checks
 
@@ -816,5 +816,5 @@ Standard checks (the full suite, including the two consolidated modules), plus `
 - [x] Follow-up after Phase 8: "Popular on IGDB" row and IGDB game detail page (recorded and completed 2026-11-15, before Phase 9)
 - [x] Phase 9: Refresh from IGDB (browser walkthrough passed 2026-11-15; optional outage step not confirmed in the browser)
 - [x] Phase 10: Saved-entry REST API (browser and token walkthrough passed 2026-11-15, reported as one overall pass)
-- [ ] Phase 11: Command-line client (lesson checkpoint)
+- [x] Phase 11: Command-line client (lesson checkpoint; walkthrough passed 2026-11-15, with the filtered list and the entry 13 update confirmed individually; terminal screenshots pending)
 - [ ] Phase 12: Final acceptance sweep and documentation

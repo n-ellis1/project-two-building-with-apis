@@ -52,7 +52,12 @@ uv run python manage.py seed_demo                # creates demo_a and demo_b fro
 
 **API token:** `uv run python manage.py drf_create_token <username>` prints a token once; store it in `.env` as `GAME_TRACKER_TOKEN` and never echo it (README shows PowerShell calls that read it from `.env`).
 
-**Later:** `uv run scripts/entries_client.py list|update` (Phase 11).
+**Command-line client** (needs `runserver` and `GAME_TRACKER_TOKEN` in `.env`; `GAME_TRACKER_API_URL` is optional, default `http://127.0.0.1:8000/api/`):
+
+```powershell
+uv run scripts/entries_client.py list --q "dark souls" --status want_to_play --page 2
+uv run scripts/entries_client.py update 13 Playing   # prints previous and updated status
+```
 
 ## Conventions
 
@@ -73,6 +78,7 @@ uv run python manage.py seed_demo                # creates demo_a and demo_b fro
 - **Detail return link:** list rows link to `/games/<id>/` plus the list's query string and page, and the detail page rebuilds its My Saved Games link with `parse_entry_query` and `parse_page`, so only validated values are ever echoed.
 - **Demo seed:** `seed_demo` loads `games/demo_data/seed.json` (real IGDB records gathered once, entries made up). It only touches accounts marked with a `DemoAccount` row, and stops before any change if `demo_a` or `demo_b` belongs to another account. It never resets passwords or changes existing Games or entries. To regenerate the fixture, use a throwaway scratchpad script (never commit it).
 - **Saved-entry API:** `games/api.py` holds `EntryViewSet` (DRF `ModelViewSet`, registered as `api-entry` on a `DefaultRouter` in `config/urls.py`), `EntrySerializer`, the read-only nested `GameSerializer` (cover URL from `cover_url(..., "large")`) and `EntryPagination` (10 per page, `last_page_strings = ()`, set on the viewset because a settings default pointing at `games.api` is a circular import). Settings: Token then Session authentication (no credentials → 401 with `WWW-Authenticate: Token`; session writes need CSRF), `IsAuthenticated`, and `COERCE_DECIMAL_TO_STRING = False`. `get_queryset()` starts from `owned_entries()`, so every detail method on another user's entry is 404. `create()` calls `save_game(request.user, igdb_id, tracking)` and maps failures with `save_error_response()`: `CLIENT_ERROR_CODES` and `duplicate_entry` (website's `ALREADY_SAVED_MESSAGE`) → 400, other `IgdbError` codes → 503 (`Retry-After` only for `igdb_rate_limited` with a valid value), `SaveFailed` → 500 `save_failed`; all as `{"detail", "code"}`. `igdb_id` is required on create and rejected on update (`IGDB_ID_UNCHANGEABLE`); PUT fills omitted tracking fields from `put_defaults()` (model defaults) before validation. API tests live in `games/tests/test_api_*.py` (`APITestCase`; tokens are created in the test database only).
+- **Command-line client:** `scripts/entries_client.py` uses only `requests` and `python-dotenv` and must never import Django, DRF or `games` code (`NoDjangoImportTests` checks this). It reads `GAME_TRACKER_TOKEN` and `GAME_TRACKER_API_URL` with `load_dotenv(ENV_FILE)` (the shell wins) and sends every request through `api_request()`, which adds the token header and a timeout and turns every `requests` exception into a fixed "Server unavailable" or similar message (`from None`). `check_response()` handles failures: 401 is a token error, 400 shows the API's field errors (`validation_messages()`), 404 uses the caller's message, any other failure is `HTTP <code>`. `update` checks the GET before sending the PATCH. `main()` passes every printed message through `redact()` as a last defense. `STATUS_LABELS` copies `Entry.Status` (`StatusLabelsMatchModelTests` keeps them in sync); `normalize_status()` accepts labels or values and sends anything else unchanged, so the API's validation decides. Exit codes: 0, 1 (configuration, request or API error), 2 (argparse). Unit tests (`games/tests/test_entries_client.py`) load the script by path and run inside `client_env()`, which removes the real `GAME_TRACKER_*` values that `manage.py test` loads from `.env` and stubs `load_dotenv`, with `FakeHttp` patched over `requests.request`. The end-to-end tests (`test_entries_client_live.py`, `LiveServerTestCase`) run it as a subprocess with a test-database token and no `GAME_TRACKER_*` or `IGDB_*` variables inherited.
 - **Routes:**
   - `/games/` My Saved Games; `/games/<id>/` plus `edit/`, `delete/` and `refresh/`, where `<id>` is the **Entry** ID
   - `/search/` and `/search/save/`, and `/search/games/<igdb_id>/` (`games:igdb_game`), the IGDB game page by **IGDB** ID
@@ -109,7 +115,7 @@ uv run python manage.py seed_demo                # creates demo_a and demo_b fro
 
 ## Per-phase workflow
 
-Work on one phase at a time (`/implement` with the PRD and plan). Phases 1 to 10 and the follow-up after Phase 8 ("Popular on IGDB" row and IGDB game detail page) are done (still pending in `docs/verification.md` as reflection evidence: the B1 before and after screenshots from Phase 4, the Reflection Question 4 Back-step screenshot from Phase 6, and the B2 and B3 before and after screenshots from Phase 7). Next is Phase 11.
+Work on one phase at a time (`/implement` with the PRD and plan). Phases 1 to 11 and the follow-up after Phase 8 ("Popular on IGDB" row and IGDB game detail page) are done (still pending in `docs/verification.md` as evidence: the B1 before and after screenshots from Phase 4, the Reflection Question 4 Back-step screenshot from Phase 6, the B2 and B3 before and after screenshots from Phase 7, and the Phase 11 lesson-checkpoint terminal screenshots of `list` and `update`). Next is Phase 12.
 
 1. Implement the phase, using `/tdd` where it fits.
 2. Run the standard checks and the phase's own checks until they pass.
